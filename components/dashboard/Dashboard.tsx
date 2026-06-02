@@ -10,9 +10,47 @@ import ComparisonChart from './ComparisonChart';
 import PlayerCards from './PlayerCards';
 import SelectableWidget from './SelectableWidget';
 import ChatPane, { type ParsedCommand, type WidgetContext } from '@/components/chat/ChatPane';
-import type { CyclonesData, ChartMetric } from './types';
+import type { CyclonesData, ChartMetric, PendingEdit, Season, Player } from './types';
 
 const fallbackData = cyclonesData as CyclonesData;
+
+const MINI_PALETTE = ['#F02849', '#FFAD0F', '#8A3FC7'];
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function miniTrendOption(type: 'line' | 'bar', seasons: Season[], metric: ChartMetric, color: string): Record<string, any> {
+  const allNames = Array.from(new Set(seasons.flatMap(s => s.players.map(p => p.name))));
+  const top3 = allNames
+    .map(name => ({ name, max: Math.max(...seasons.flatMap(s => s.players.filter(p => p.name === name).map(p => p[metric] as number))) }))
+    .sort((a, b) => b.max - a.max).slice(0, 3).map(p => p.name);
+  return {
+    animation: false, backgroundColor: 'transparent',
+    grid: { top: 4, right: 4, bottom: 24, left: 28, containLabel: false },
+    xAxis: { type: 'category', data: seasons.map(s => s.year.slice(2)), axisLabel: { fontSize: 8, color: '#94a3b8' }, axisTick: { show: false }, axisLine: { lineStyle: { color: '#e2e8f0' } } },
+    yAxis: { type: 'value', axisLabel: { fontSize: 8, color: '#94a3b8' }, splitLine: { lineStyle: { color: '#f1f5f9' } }, axisLine: { show: false }, axisTick: { show: false } },
+    series: top3.map((name, i) => {
+      const c = i === 0 ? color : MINI_PALETTE[i - 1];
+      const data = seasons.map(s => +(s.players.find(p => p.name === name)?.[metric] as number ?? 0).toFixed(1));
+      return type === 'line'
+        ? { name, type: 'line', smooth: true, symbol: 'none', lineStyle: { width: 1.5, color: c }, itemStyle: { color: c }, data }
+        : { name, type: 'bar', barMaxWidth: 8, itemStyle: { color: c, borderRadius: [2, 2, 0, 0] }, data };
+    }),
+  };
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function miniCompOption(type: 'bar' | 'line', players: Player[], metric: ChartMetric, color: string): Record<string, any> {
+  const data = [...players].sort((a, b) => (b[metric] as number) - (a[metric] as number)).slice(0, 8)
+    .map(p => ({ name: p.name.split(' ').pop() ?? p.name, value: +(p[metric] as number).toFixed(1) }));
+  return {
+    animation: false, backgroundColor: 'transparent',
+    grid: { top: 4, right: 4, bottom: 28, left: 28, containLabel: false },
+    xAxis: { type: 'category', data: data.map(d => d.name), axisLabel: { fontSize: 7, color: '#94a3b8', rotate: -30, interval: 0 }, axisTick: { show: false }, axisLine: { lineStyle: { color: '#e2e8f0' } } },
+    yAxis: { type: 'value', axisLabel: { fontSize: 7, color: '#94a3b8' }, splitLine: { lineStyle: { color: '#f1f5f9' } }, axisLine: { show: false }, axisTick: { show: false } },
+    series: [type === 'bar'
+      ? { type: 'bar', data: data.map(d => d.value), barMaxWidth: 12, itemStyle: { color, borderRadius: [3, 3, 0, 0] } }
+      : { type: 'line', smooth: true, symbol: 'none', data: data.map(d => d.value), lineStyle: { width: 2, color }, itemStyle: { color } }],
+  };
+}
 
 const WIDGET_META: Record<string, { label: string; isChart: boolean }> = {
   stats: { label: 'Season Highlights', isChart: false },
@@ -42,6 +80,18 @@ export default function Dashboard({ isPreview = false, noSidebar = false, teamId
   const [leaderboardLimit, setLeaderboardLimit] = useState<number | null>(null);
   const [accentColor, setAccentColor] = useState<string>('#3b82f6');
   const [widgetTitles, setWidgetTitles] = useState<Record<string, string>>({});
+  const [pendingEdits, setPendingEdits] = useState<PendingEdit[]>([]);
+  // snapshot taken before the first pending edit so we can revert all at once
+  const [editSnapshot, setEditSnapshot] = useState<{
+    trendChartType: 'line' | 'bar';
+    compChartType: 'bar' | 'line';
+    chartMetric: ChartMetric;
+    leaderboardSort: string;
+    leaderboardLimit: number | null;
+    accentColor: string;
+    widgetTitles: Record<string, string>;
+    highlightedPlayer: string | null;
+  } | null>(null);
 
   const handleWidgetSelect = (id: string, shiftKey = false) => {
     setSelectedWidgets(prev => {
@@ -81,38 +131,123 @@ export default function Dashboard({ isPreview = false, noSidebar = false, teamId
   const widgetContexts: WidgetContext[] = selectedWidgets.map(id => ({
     id,
     ...(WIDGET_META[id] ?? { label: id, isChart: false }),
+    chartType: id === 'trend-chart' ? trendChartType : id === 'comparison-chart' ? compChartType : undefined,
   }));
 
-  const handleCommand = (cmd: ParsedCommand) => {
+  const pendingWidgetIds = useMemo(
+    () => Array.from(new Set(pendingEdits.flatMap(e => e.affectedWidgetIds))),
+    [pendingEdits]
+  );
+
+  const handleCommand = (cmd: ParsedCommand): PendingEdit | null => {
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+
+    // Snapshot state before the first edit so we can revert all at once
+    setPendingEdits(prev => {
+      if (prev.length === 0) {
+        setEditSnapshot({ trendChartType, compChartType, chartMetric, leaderboardSort, leaderboardLimit, accentColor, widgetTitles, highlightedPlayer });
+      }
+      return prev;
+    });
+
+    let edit: PendingEdit | null = null;
+
     switch (cmd.type) {
-      case 'setMetric':
-        setChartMetric(cmd.value as ChartMetric);
+      case 'setMetric': {
+        const beforeMetric = chartMetric;
+        const afterMetric = cmd.value as ChartMetric;
+        setChartMetric(afterMetric);
+        const previewOptions = {
+          before: miniCompOption(compChartType, season.players, beforeMetric, accentColor),
+          after: miniCompOption(compChartType, season.players, afterMetric, accentColor),
+        };
+        edit = { id, description: `Changed metric to ${afterMetric.toUpperCase()}`, previewType: 'metric', before: beforeMetric.toUpperCase(), after: afterMetric.toUpperCase(), affectedWidgetIds: ['trend-chart', 'comparison-chart'], previewOptions };
         break;
-      case 'highlight':
+      }
+      case 'highlight': {
+        const before = highlightedPlayer ?? 'none';
         setHighlightedPlayer(cmd.value ?? null);
+        const label = cmd.value === '__top_scorer__' ? 'top scorer' : (cmd.value ?? '');
+        edit = { id, description: `Highlighted ${label}`, previewType: 'highlight', before, after: label, affectedWidgetIds: ['leaderboard', 'player-cards'] };
         break;
+      }
       case 'clearHighlight':
         setHighlightedPlayer(null);
+        edit = { id, description: 'Cleared player highlight', previewType: 'highlight', before: highlightedPlayer ?? 'none', after: 'none', affectedWidgetIds: ['leaderboard', 'player-cards'] };
         break;
-      case 'setChartType':
-        if (cmd.widgetId === 'trend-chart') setTrendChartType(cmd.value as 'line' | 'bar');
-        else if (cmd.widgetId === 'comparison-chart') setCompChartType(cmd.value as 'bar' | 'line');
+      case 'setChartType': {
+        const isTrend = cmd.widgetId === 'trend-chart';
+        const before = isTrend ? trendChartType : compChartType;
+        const after = cmd.value as 'line' | 'bar';
+        if (isTrend) setTrendChartType(after);
+        else setCompChartType(after as 'bar' | 'line');
+        const chartLabel = isTrend ? 'Scoring Trend' : 'Player Comparison';
+        const previewOptions = isTrend
+          ? { before: miniTrendOption(before as 'line' | 'bar', data.seasons, chartMetric, accentColor), after: miniTrendOption(after, data.seasons, chartMetric, accentColor) }
+          : { before: miniCompOption(before as 'bar' | 'line', season.players, chartMetric, accentColor), after: miniCompOption(after as 'bar' | 'line', season.players, chartMetric, accentColor) };
+        edit = { id, description: `Changed ${chartLabel} to ${after} chart`, previewType: 'chart-type', before, after, affectedWidgetIds: [cmd.widgetId ?? 'trend-chart'], previewOptions };
         break;
-      case 'setSort':
+      }
+      case 'setSort': {
+        const before = leaderboardSort;
         setLeaderboardSort(cmd.value ?? 'ppg');
+        edit = { id, description: `Sorted leaderboard by ${cmd.value?.toUpperCase()}`, previewType: 'sort', before: before.toUpperCase(), after: (cmd.value ?? '').toUpperCase(), affectedWidgetIds: ['leaderboard'] };
         break;
-      case 'setLimit':
-        setLeaderboardLimit(cmd.value ? parseInt(cmd.value) : null);
+      }
+      case 'setLimit': {
+        const n = cmd.value ? parseInt(cmd.value) : null;
+        const before = leaderboardLimit ? `Top ${leaderboardLimit}` : 'All players';
+        setLeaderboardLimit(n);
+        edit = { id, description: n ? `Showing top ${n} players` : 'Showing all players', previewType: 'limit', before, after: n ? `Top ${n}` : 'All players', affectedWidgetIds: ['leaderboard'] };
         break;
-      case 'setAccentColor':
-        setAccentColor(cmd.value ?? '#3b82f6');
+      }
+      case 'setAccentColor': {
+        const before = accentColor;
+        const after = cmd.value ?? '#3b82f6';
+        setAccentColor(after);
+        const previewOptions = {
+          before: miniTrendOption(trendChartType, data.seasons, chartMetric, before),
+          after: miniTrendOption(trendChartType, data.seasons, chartMetric, after),
+        };
+        edit = { id, description: 'Changed chart accent color', previewType: 'color', before, after, affectedWidgetIds: ['trend-chart', 'comparison-chart'], previewOptions };
         break;
-      case 'setWidgetTitle':
+      }
+      case 'setWidgetTitle': {
         if (cmd.widgetId && cmd.value) {
+          const before = widgetTitles[cmd.widgetId] ?? WIDGET_META[cmd.widgetId]?.label ?? cmd.widgetId;
           setWidgetTitles(prev => ({ ...prev, [cmd.widgetId!]: cmd.value! }));
+          edit = { id, description: `Renamed widget to "${cmd.value}"`, previewType: 'title', before, after: cmd.value, affectedWidgetIds: [cmd.widgetId] };
         }
         break;
+      }
     }
+
+    if (edit) {
+      setPendingEdits(prev => [...prev, edit!]);
+    }
+    return edit;
+  };
+
+  const handleAcceptEdits = () => {
+    setPendingEdits([]);
+    setEditSnapshot(null);
+    setSelectedWidgets([]);
+  };
+
+  const handleDiscardEdits = () => {
+    if (editSnapshot) {
+      setTrendChartType(editSnapshot.trendChartType);
+      setCompChartType(editSnapshot.compChartType);
+      setChartMetric(editSnapshot.chartMetric);
+      setLeaderboardSort(editSnapshot.leaderboardSort);
+      setLeaderboardLimit(editSnapshot.leaderboardLimit);
+      setAccentColor(editSnapshot.accentColor);
+      setWidgetTitles(editSnapshot.widgetTitles);
+      setHighlightedPlayer(editSnapshot.highlightedPlayer);
+    }
+    setPendingEdits([]);
+    setEditSnapshot(null);
+    // keep widget selection so the user can continue editing
   };
 
   return (
@@ -192,12 +327,12 @@ export default function Dashboard({ isPreview = false, noSidebar = false, teamId
 
         {/* Deselect on background click */}
         <div className="px-8 py-6 space-y-6" onClick={() => setSelectedWidgets([])}>
-          <SelectableWidget id="stats" selectedIds={selectedWidgets} onSelect={handleWidgetSelect}>
+          <SelectableWidget id="stats" selectedIds={selectedWidgets} pendingIds={pendingWidgetIds} onSelect={handleWidgetSelect}>
             <StatsBar season={season} />
           </SelectableWidget>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <SelectableWidget id="trend-chart" selectedIds={selectedWidgets} onSelect={handleWidgetSelect}>
+            <SelectableWidget id="trend-chart" selectedIds={selectedWidgets} pendingIds={pendingWidgetIds} onSelect={handleWidgetSelect}>
               <TrendChart
                 seasons={data.seasons}
                 metric={chartMetric}
@@ -206,7 +341,7 @@ export default function Dashboard({ isPreview = false, noSidebar = false, teamId
                 title={widgetTitles['trend-chart']}
               />
             </SelectableWidget>
-            <SelectableWidget id="comparison-chart" selectedIds={selectedWidgets} onSelect={handleWidgetSelect}>
+            <SelectableWidget id="comparison-chart" selectedIds={selectedWidgets} pendingIds={pendingWidgetIds} onSelect={handleWidgetSelect}>
               <ComparisonChart
                 season={season}
                 metric={chartMetric}
@@ -218,7 +353,7 @@ export default function Dashboard({ isPreview = false, noSidebar = false, teamId
             </SelectableWidget>
           </div>
 
-          <SelectableWidget id="player-cards" selectedIds={selectedWidgets} onSelect={handleWidgetSelect}>
+          <SelectableWidget id="player-cards" selectedIds={selectedWidgets} pendingIds={pendingWidgetIds} onSelect={handleWidgetSelect}>
             <div className="bg-white rounded-xl border border-slate-200 p-5">
               <h2 className="text-slate-800 font-bold text-sm uppercase tracking-wider mb-3">
                 Top Performers · {season.year}
@@ -232,7 +367,7 @@ export default function Dashboard({ isPreview = false, noSidebar = false, teamId
             </div>
           </SelectableWidget>
 
-          <SelectableWidget id="leaderboard" selectedIds={selectedWidgets} onSelect={handleWidgetSelect}>
+          <SelectableWidget id="leaderboard" selectedIds={selectedWidgets} pendingIds={pendingWidgetIds} onSelect={handleWidgetSelect}>
             <div className="bg-white rounded-xl border border-slate-200 p-5">
               <div className="flex items-center justify-between mb-3">
                 <h2 className="text-slate-800 font-bold text-sm uppercase tracking-wider">
@@ -274,6 +409,9 @@ export default function Dashboard({ isPreview = false, noSidebar = false, teamId
             highlightedPlayer={resolvedHighlight}
             selectedWidgets={widgetContexts}
             onClearWidget={(id) => setSelectedWidgets(prev => prev.filter(w => w !== id))}
+            pendingEdits={pendingEdits}
+            onAcceptEdits={handleAcceptEdits}
+            onDiscardEdits={handleDiscardEdits}
           />
         </div>
       )}

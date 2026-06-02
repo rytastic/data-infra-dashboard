@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
-import type { ChartMetric } from '@/components/dashboard/types';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import ReactECharts from 'echarts-for-react';
+import type { ChartMetric, PendingEdit } from '@/components/dashboard/types';
 
 interface Message {
   id: number;
@@ -29,15 +30,19 @@ export interface WidgetContext {
   id: string;
   label: string;
   isChart: boolean;
+  chartType?: 'line' | 'bar';
 }
 
 interface Props {
-  onCommand: (cmd: ParsedCommand) => void;
+  onCommand: (cmd: ParsedCommand) => PendingEdit | null;
   onClose?: () => void;
   chartMetric: ChartMetric;
   highlightedPlayer: string | null;
   selectedWidgets: WidgetContext[];
   onClearWidget: (id: string) => void;
+  pendingEdits: PendingEdit[];
+  onAcceptEdits: () => void;
+  onDiscardEdits: () => void;
 }
 
 // ─── command parsing ──────────────────────────────────────────────────────────
@@ -170,6 +175,9 @@ export default function ChatPane({
   highlightedPlayer,
   selectedWidgets,
   onClearWidget,
+  pendingEdits,
+  onAcceptEdits,
+  onDiscardEdits,
 }: Props) {
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -199,6 +207,24 @@ export default function ChatPane({
   const overflowCount = Math.max(0, selectedWidgets.length - MAX_VISIBLE_CHIPS);
   const isEmptyState = messages.length === 1 && messages[0].role === 'assistant' && selectedWidgets.length === 0;
 
+  const handleAccept = async () => {
+    setMessages(prev => [...prev, { id: ++msgIdCounter, role: 'user', text: 'Accept', timestamp: new Date() }]);
+    onAcceptEdits();
+    setIsTyping(true);
+    await new Promise(r => setTimeout(r, 600));
+    setIsTyping(false);
+    setMessages(prev => [...prev, { id: ++msgIdCounter, role: 'assistant', text: 'Done! All changes have been applied to your dashboard.', timestamp: new Date() }]);
+  };
+
+  const handleDiscard = async () => {
+    setMessages(prev => [...prev, { id: ++msgIdCounter, role: 'user', text: 'Discard all', timestamp: new Date() }]);
+    onDiscardEdits();
+    setIsTyping(true);
+    await new Promise(r => setTimeout(r, 600));
+    setIsTyping(false);
+    setMessages(prev => [...prev, { id: ++msgIdCounter, role: 'assistant', text: 'Discarded. Your dashboard has been reverted to its previous state.', timestamp: new Date() }]);
+  };
+
   const sendMessage = async (text: string) => {
     if (!text.trim()) return;
     const userMsg: Message = { id: ++msgIdCounter, role: 'user', text, timestamp: new Date() };
@@ -210,8 +236,9 @@ export default function ChatPane({
     setIsTyping(false);
 
     const result = parseCommand(text, primaryWidget);
+    if (result) onCommand(result.command);
     const responseText = result
-      ? (onCommand(result.command), result.response)
+      ? result.response
       : buildFallback(text, primaryWidget);
 
     setMessages(prev => [
@@ -302,6 +329,19 @@ export default function ChatPane({
               </div>
             </div>
           )}
+          {/* Pending edits approval card */}
+          {pendingEdits.length > 0 && (
+            <div className="flex justify-start mt-1">
+              <div className="w-6 h-6 rounded-full bg-slate-900 flex items-center justify-center flex-shrink-0 mr-2 mt-1">
+                <StarIcon className="w-3 h-3 text-white" />
+              </div>
+              <EditsCard
+                edits={pendingEdits}
+                onAccept={handleAccept}
+                onDiscard={handleDiscard}
+              />
+            </div>
+          )}
           <div ref={bottomRef} />
         </div>
       )}
@@ -367,12 +407,16 @@ export default function ChatPane({
 
           <div className="my-3 border-t border-slate-200" />
 
-          {/* Suggestion pills — max 3 */}
+          {/* Suggestion pills — max 3, context-aware */}
           <div className="flex flex-wrap gap-2">
             {(() => {
               const pills: string[] = [];
-              if (selectedWidgets.some(w => w.isChart)) {
-                pills.push('Change to bar chart', 'Change to line chart');
+              const chartWidgets = selectedWidgets.filter(w => w.isChart);
+              if (chartWidgets.length > 0) {
+                const allBar = chartWidgets.every(w => w.chartType === 'bar');
+                const allLine = chartWidgets.every(w => w.chartType === 'line');
+                if (!allBar) pills.push('Change to bar chart');
+                if (!allLine) pills.push('Change to line chart');
               }
               if (selectedWidgets.some(w => w.id === 'leaderboard')) {
                 pills.push('Sort by rebounds', 'Show top 5 players');
@@ -427,6 +471,126 @@ function WidgetChip({ label, onRemove }: { label: string; onRemove: () => void }
     </div>
   );
 }
+
+// ─── edits card ───────────────────────────────────────────────────────────────
+
+interface HoverState {
+  edit: PendingEdit;
+  top: number;
+  right: number;
+}
+
+function EditsCard({ edits, onAccept, onDiscard }: {
+  edits: PendingEdit[];
+  onAccept: () => void;
+  onDiscard: () => void;
+}) {
+  const [hovered, setHovered] = useState<HoverState | null>(null);
+
+  const handleMouseEnter = useCallback((e: React.MouseEvent<HTMLDivElement>, edit: PendingEdit) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    setHovered({ edit, top: rect.top + rect.height / 2, right: window.innerWidth - rect.left + 12 });
+  }, []);
+
+  return (
+    <div className="flex-1 max-w-[85%] rounded-2xl rounded-tl-sm bg-violet-50 overflow-hidden">
+      <div className="px-5 pt-5 pb-3">
+        <h3 className="text-xl font-bold text-slate-800">Review edits</h3>
+      </div>
+
+      <div className="px-3 pb-3">
+        {edits.map((edit, i) => (
+          <div key={edit.id}>
+            {i > 0 && <div className="border-t border-violet-200 mx-2" />}
+            <div
+              className="flex items-center justify-between px-2 py-3 gap-3 rounded-xl hover:bg-violet-100 transition-colors cursor-default"
+              onMouseEnter={(e) => handleMouseEnter(e, edit)}
+              onMouseLeave={() => setHovered(null)}
+            >
+              <span className="text-sm text-slate-700 leading-snug">{edit.description}</span>
+              <div className="w-5 h-5 rounded flex-shrink-0 flex items-center justify-center bg-violet-500">
+                <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex items-center justify-end gap-5 px-5 py-3 border-t border-violet-200">
+        <button onClick={onDiscard} className="text-sm font-medium text-violet-500 hover:text-violet-800 transition-colors">
+          Discard all
+        </button>
+        <button onClick={onAccept} className="text-sm font-semibold text-violet-600 hover:text-violet-900 transition-colors">
+          Accept
+        </button>
+      </div>
+
+      {/* Fixed-position before/after popover */}
+      {hovered && (
+        <EditPreviewPopover state={hovered} onClose={() => setHovered(null)} />
+      )}
+    </div>
+  );
+}
+
+function EditPreviewPopover({ state, onClose }: { state: HoverState; onClose: () => void }) {
+  const { edit, top, right } = state;
+  const hasCharts = !!edit.previewOptions;
+
+  return (
+    <div
+      className="fixed z-[9999] bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden"
+      style={{
+        top,
+        right,
+        transform: 'translateY(-50%)',
+        width: hasCharts ? 440 : 280,
+      }}
+      onMouseEnter={() => {/* keep open when hovering preview */}}
+      onMouseLeave={onClose}
+    >
+      <div className="px-4 pt-3 pb-2 border-b border-slate-100">
+        <p className="text-xs font-semibold text-slate-500">{edit.description}</p>
+      </div>
+      <div className="flex">
+        {/* Before */}
+        <div className="flex-1 p-3">
+          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-2">Before</p>
+          {hasCharts ? (
+            <ReactECharts option={edit.previewOptions!.before} style={{ height: 130 }} notMerge />
+          ) : (
+            <FallbackPreview value={edit.before} previewType={edit.previewType} />
+          )}
+        </div>
+        <div className="w-px bg-slate-100" />
+        {/* After */}
+        <div className="flex-1 p-3">
+          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-2">After</p>
+          {hasCharts ? (
+            <ReactECharts option={edit.previewOptions!.after} style={{ height: 130 }} notMerge />
+          ) : (
+            <FallbackPreview value={edit.after} previewType={edit.previewType} />
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FallbackPreview({ value, previewType }: { value: string; previewType: PendingEdit['previewType'] }) {
+  if (previewType === 'color') {
+    return <div className="h-10 rounded-lg w-full" style={{ background: value }} />;
+  }
+  return (
+    <div className="px-2 py-2 bg-slate-100 rounded-lg text-xs font-medium text-slate-600 text-center truncate">
+      {value}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 function buildFallback(text: string, primaryWidget: WidgetContext | null): string {
   const ctx = primaryWidget ? ` for **${primaryWidget.label}**` : '';

@@ -29,6 +29,19 @@ export interface CyclonesData {
 
 export type ChartMetric = 'ppg' | 'rpg' | 'apg' | 'spg';
 
+export type EditPreviewType = 'chart-type' | 'color' | 'metric' | 'sort' | 'limit' | 'title' | 'highlight';
+
+export interface PendingEdit {
+  id: string;
+  description: string;
+  previewType: EditPreviewType;
+  before: string;
+  after: string;
+  affectedWidgetIds: string[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  previewOptions?: { before: Record<string, any>; after: Record<string, any> };
+}
+
 export const METRIC_LABELS: Record<ChartMetric, string> = {
   ppg: 'Points Per Game',
   rpg: 'Rebounds Per Game',
