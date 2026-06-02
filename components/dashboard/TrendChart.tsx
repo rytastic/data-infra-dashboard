@@ -2,7 +2,7 @@
 
 import ReactECharts from 'echarts-for-react';
 import type { Season, ChartMetric } from './types';
-import { METRIC_LABELS } from './types';
+import { METRIC_LABELS, METRIC_SHORT } from './types';
 
 interface Props {
   seasons: Season[];
@@ -117,8 +117,8 @@ export default function TrendChart({ seasons, metric }: Props) {
             {METRIC_LABELS[metric]} — Top 5 players over 5 seasons
           </p>
         </div>
-        <span className="text-xs font-medium px-2.5 py-1 rounded-md bg-accent text-primary">
-          {METRIC_LABELS[metric]}
+        <span className="text-xs font-semibold px-2.5 py-1 rounded-md bg-slate-100 text-slate-600">
+          {METRIC_SHORT[metric]}
         </span>
       </div>
       <ReactECharts option={option} style={{ height: 280 }} notMerge />

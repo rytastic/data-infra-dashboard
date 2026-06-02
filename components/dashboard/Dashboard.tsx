@@ -142,10 +142,6 @@ export default function Dashboard({ isPreview = false, noSidebar = false, teamId
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 rounded-lg">
-            <span className="text-slate-500 text-xs">Record:</span>
-            <span className="text-xs font-bold text-[#3b82f6]">{season.record}</span>
-          </div>
         </header>
 
         {/* Deselect on background click */}
