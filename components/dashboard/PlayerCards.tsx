@@ -6,13 +6,13 @@ import SelectableWidget from './SelectableWidget';
 interface Props {
   players: Player[];
   highlightedPlayer: string | null;
-  selectedWidgetId?: string | null;
-  onWidgetSelect?: (id: string) => void;
+  selectedWidgetIds?: string[];
+  onWidgetSelect?: (id: string, shiftKey: boolean) => void;
 }
 
 const MEDALS = ['🥇', '🥈', '🥉'];
 
-export default function PlayerCards({ players, highlightedPlayer, selectedWidgetId, onWidgetSelect }: Props) {
+export default function PlayerCards({ players, highlightedPlayer, selectedWidgetIds = [], onWidgetSelect }: Props) {
   const top3 = [...players].sort((a, b) => b.ppg - a.ppg).slice(0, 3);
 
   return (
@@ -26,8 +26,8 @@ export default function PlayerCards({ players, highlightedPlayer, selectedWidget
           <SelectableWidget
             key={player.name}
             id={widgetId}
-            selectedId={selectedWidgetId}
-            onSelect={(id) => onWidgetSelect?.(id)}
+            selectedIds={selectedWidgetIds}
+            onSelect={(id, shiftKey) => onWidgetSelect?.(id, shiftKey)}
           >
             <div className="rounded-xl border bg-white border-slate-200 p-5 transition-all duration-300">
               {/* Header */}

@@ -36,8 +36,8 @@ interface Props {
   onClose?: () => void;
   chartMetric: ChartMetric;
   highlightedPlayer: string | null;
-  selectedWidget: WidgetContext | null;
-  onClearWidget: () => void;
+  selectedWidgets: WidgetContext[];
+  onClearWidget: (id: string) => void;
 }
 
 // ─── command parsing ──────────────────────────────────────────────────────────
@@ -75,14 +75,10 @@ const CLEAR_TRIGGER = /clear|remove|reset\s+highlight/i;
 
 function parseCommand(
   input: string,
-  selectedWidget: WidgetContext | null,
+  primaryWidget: WidgetContext | null,
 ): { command: ParsedCommand; response: string } | null {
-  // ── highlight / clear (check before metric so "scorer" doesn't match PPG) ──
   if (CLEAR_TRIGGER.test(input)) {
-    return {
-      command: { type: 'clearHighlight' },
-      response: 'Cleared! The player highlight has been removed.',
-    };
+    return { command: { type: 'clearHighlight' }, response: 'Cleared! The player highlight has been removed.' };
   }
   if (TOP_SCORER_TRIGGER.test(input)) {
     return {
@@ -99,83 +95,56 @@ function parseCommand(
     };
   }
 
-  // ── chart type ─────────────────────────────────────────────────────────────
   if (/\bbar\b.*chart|\bbar\b.*graph|switch.*\bbar\b|change.*\bbar\b|as bars?\b|to bar\b/i.test(input)) {
-    const widgetId = selectedWidget?.isChart ? selectedWidget.id : 'trend-chart';
-    const label = selectedWidget?.isChart ? selectedWidget.label : 'Chart 1 · Scoring Trend';
-    return {
-      command: { type: 'setChartType', value: 'bar', widgetId },
-      response: `Switched **${label}** to a bar chart.`,
-    };
+    const widgetId = primaryWidget?.isChart ? primaryWidget.id : 'trend-chart';
+    const label = primaryWidget?.isChart ? primaryWidget.label : 'Chart 1 · Scoring Trend';
+    return { command: { type: 'setChartType', value: 'bar', widgetId }, response: `Switched **${label}** to a bar chart.` };
   }
   if (/\bline\b.*chart|\bline\b.*graph|switch.*\bline\b|change.*\bline\b|as lines?\b|to line\b/i.test(input)) {
-    const widgetId = selectedWidget?.isChart ? selectedWidget.id : 'trend-chart';
-    const label = selectedWidget?.isChart ? selectedWidget.label : 'Chart 1 · Scoring Trend';
-    return {
-      command: { type: 'setChartType', value: 'line', widgetId },
-      response: `Switched **${label}** to a line chart.`,
-    };
+    const widgetId = primaryWidget?.isChart ? primaryWidget.id : 'trend-chart';
+    const label = primaryWidget?.isChart ? primaryWidget.label : 'Chart 1 · Scoring Trend';
+    return { command: { type: 'setChartType', value: 'line', widgetId }, response: `Switched **${label}** to a line chart.` };
   }
 
-  // ── leaderboard sort ───────────────────────────────────────────────────────
   for (const { patterns, key, label } of SORT_TRIGGERS) {
     if (patterns.some(p => p.test(input))) {
-      return {
-        command: { type: 'setSort', value: key },
-        response: `Sorted the leaderboard by **${label}**.`,
-      };
+      return { command: { type: 'setSort', value: key }, response: `Sorted the leaderboard by **${label}**.` };
     }
   }
 
-  // ── leaderboard row limit ──────────────────────────────────────────────────
   const topNMatch = input.match(/top\s+(\d+)\s*player|show\s+(\d+)\s*player|show\s+top\s+(\d+)/i);
   if (topNMatch) {
     const n = parseInt(topNMatch[1] ?? topNMatch[2] ?? topNMatch[3]);
-    return {
-      command: { type: 'setLimit', value: String(n) },
-      response: `Showing the top **${n} players** in the leaderboard.`,
-    };
+    return { command: { type: 'setLimit', value: String(n) }, response: `Showing the top **${n} players** in the leaderboard.` };
   }
   if (/show\s+all|all\s+player|reset\s+(?:limit|filter)|full\s+leaderboard/i.test(input)) {
-    return {
-      command: { type: 'setLimit', value: '' },
-      response: 'Showing all players in the leaderboard.',
-    };
+    return { command: { type: 'setLimit', value: '' }, response: 'Showing all players in the leaderboard.' };
   }
 
-  // ── accent color ───────────────────────────────────────────────────────────
   if (/color|theme|accent/i.test(input)) {
     for (const { patterns, value, label } of COLOR_TRIGGERS) {
       if (patterns.some(p => p.test(input))) {
-        return {
-          command: { type: 'setAccentColor', value },
-          response: `Updated the chart accent to **${label}**.`,
-        };
+        return { command: { type: 'setAccentColor', value }, response: `Updated the chart accent to **${label}**.` };
       }
     }
   }
 
-  // ── widget title rename ────────────────────────────────────────────────────
   const renameMatch = input.match(
     /rename.*?to\s+["']?(.+?)["']?\s*$|set.*?title.*?to\s+["']?(.+?)["']?\s*$|call\s+(?:it|this)\s+["']?(.+?)["']?\s*$/i,
   );
-  if (renameMatch && selectedWidget) {
+  if (renameMatch && primaryWidget) {
     const newTitle = (renameMatch[1] ?? renameMatch[2] ?? renameMatch[3])?.trim();
     if (newTitle) {
       return {
-        command: { type: 'setWidgetTitle', value: newTitle, widgetId: selectedWidget.id },
-        response: `Renamed **${selectedWidget.label}** to **${newTitle}**.`,
+        command: { type: 'setWidgetTitle', value: newTitle, widgetId: primaryWidget.id },
+        response: `Renamed **${primaryWidget.label}** to **${newTitle}**.`,
       };
     }
   }
 
-  // ── metric changes (after sort so "sort by points" ≠ metric change) ───────
   for (const { patterns, metric, label } of METRIC_TRIGGERS) {
     if (patterns.some(p => p.test(input))) {
-      return {
-        command: { type: 'setMetric', value: metric },
-        response: `Updated both charts to show **${label}**.`,
-      };
+      return { command: { type: 'setMetric', value: metric }, response: `Updated both charts to show **${label}**.` };
     }
   }
 
@@ -184,6 +153,7 @@ function parseCommand(
 
 // ─── component ────────────────────────────────────────────────────────────────
 
+const MAX_VISIBLE_CHIPS = 3;
 let msgIdCounter = 10;
 
 export default function ChatPane({
@@ -191,7 +161,7 @@ export default function ChatPane({
   onClose,
   chartMetric,
   highlightedPlayer,
-  selectedWidget,
+  selectedWidgets,
   onClearWidget,
 }: Props) {
   const [messages, setMessages] = useState<Message[]>([
@@ -204,12 +174,22 @@ export default function ChatPane({
   ]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [overflowOpen, setOverflowOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Close overflow popover when selection changes
+  useEffect(() => { setOverflowOpen(false); }, [selectedWidgets.length]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isTyping]);
+
+  // Most-recently-selected widget drives command targeting
+  const primaryWidget = selectedWidgets.length > 0 ? selectedWidgets[selectedWidgets.length - 1] : null;
+
+  const visibleChips = selectedWidgets.slice(0, MAX_VISIBLE_CHIPS);
+  const overflowCount = Math.max(0, selectedWidgets.length - MAX_VISIBLE_CHIPS);
 
   const sendMessage = async (text: string) => {
     if (!text.trim()) return;
@@ -221,15 +201,10 @@ export default function ChatPane({
     await new Promise(r => setTimeout(r, 500 + Math.random() * 400));
     setIsTyping(false);
 
-    const result = parseCommand(text, selectedWidget);
-    let responseText: string;
-
-    if (result) {
-      onCommand(result.command);
-      responseText = result.response;
-    } else {
-      responseText = buildFallback(text, selectedWidget);
-    }
+    const result = parseCommand(text, primaryWidget);
+    const responseText = result
+      ? (onCommand(result.command), result.response)
+      : buildFallback(text, primaryWidget);
 
     setMessages(prev => [
       ...prev,
@@ -296,11 +271,7 @@ export default function ChatPane({
             </div>
             <div className="bg-slate-100 rounded-2xl rounded-tl-sm px-4 py-3 flex items-center gap-1.5">
               {[0, 1, 2].map(i => (
-                <div
-                  key={i}
-                  className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-bounce"
-                  style={{ animationDelay: `${i * 120}ms` }}
-                />
+                <div key={i} className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: `${i * 120}ms` }} />
               ))}
             </div>
           </div>
@@ -308,50 +279,89 @@ export default function ChatPane({
         <div ref={bottomRef} />
       </div>
 
-      {/* Widget context card */}
-      {selectedWidget && (
+      {/* Widget context + suggestions */}
+      {selectedWidgets.length > 0 ? (
         <div className="px-4 py-3 border-t border-slate-100 flex-shrink-0">
-          <div className="rounded-2xl border border-slate-200 overflow-hidden shadow-sm bg-white">
-            <div className="relative h-[88px] bg-gradient-to-b from-slate-50 to-white px-3 pt-3 pb-1">
-              <MiniChartSVG />
-              <button
-                onClick={onClearWidget}
-                className="absolute top-2 right-2 w-5 h-5 rounded-full bg-white border border-slate-200 shadow-sm flex items-center justify-center text-slate-400 hover:text-slate-700 transition-colors"
-              >
-                <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <div className="px-3 py-2 border-t border-slate-100">
-              <p className="text-xs font-medium text-slate-700">{selectedWidget.label}</p>
-            </div>
+          {/* Stacked chips — max 3 visible */}
+          <div className="space-y-1.5">
+            {visibleChips.map(widget => (
+              <WidgetChip
+                key={widget.id}
+                label={widget.label}
+                isActive={widget.id === primaryWidget?.id}
+                onRemove={() => onClearWidget(widget.id)}
+              />
+            ))}
           </div>
 
-          {/* Context-aware suggestions */}
+          {/* Overflow toggle */}
+          {overflowCount > 0 && (
+            <div className="relative mt-1.5">
+              <button
+                onClick={() => setOverflowOpen(o => !o)}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-slate-500 hover:text-slate-800 rounded-lg hover:bg-slate-100 transition-colors"
+              >
+                <svg
+                  className={`w-3.5 h-3.5 transition-transform duration-200 ${overflowOpen ? 'rotate-180' : ''}`}
+                  fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
+                </svg>
+                +{overflowCount} more
+              </button>
+
+              {overflowOpen && (
+                <div className="absolute bottom-full left-0 right-0 mb-2 bg-white border border-slate-200 rounded-2xl shadow-xl z-50 overflow-hidden">
+                  <div className="px-3 py-2 border-b border-slate-100 flex items-center justify-between">
+                    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">
+                      All selected — {selectedWidgets.length} widgets
+                    </p>
+                    <button
+                      onClick={() => setOverflowOpen(false)}
+                      className="text-slate-400 hover:text-slate-700 transition-colors"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                  <div className="p-2 space-y-1.5 max-h-48 overflow-y-auto">
+                    {selectedWidgets.map(widget => (
+                      <WidgetChip
+                        key={widget.id}
+                        label={widget.label}
+                        isActive={widget.id === primaryWidget?.id}
+                        onRemove={() => { onClearWidget(widget.id); }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Context-aware suggestion pills */}
           <div className="mt-2.5 flex flex-wrap gap-2">
-            {selectedWidget.isChart && (
+            {selectedWidgets.some(w => w.isChart) && (
               <>
                 <SuggestionPill label="Change to bar chart" onSend={sendMessage} />
                 <SuggestionPill label="Change to line chart" onSend={sendMessage} />
                 <SuggestionPill label="Use ISU red" onSend={sendMessage} />
               </>
             )}
-            {selectedWidget.id === 'leaderboard' && (
+            {selectedWidgets.some(w => w.id === 'leaderboard') && (
               <>
                 <SuggestionPill label="Sort by rebounds" onSend={sendMessage} />
                 <SuggestionPill label="Show top 5 players" onSend={sendMessage} />
               </>
             )}
-            {selectedWidget.id === 'stats' && (
+            {selectedWidgets.some(w => w.id === 'stats') && (
               <SuggestionPill label="Highlight top scorer" onSend={sendMessage} />
             )}
           </div>
         </div>
-      )}
-
-      {/* Global suggestions when nothing selected */}
-      {!selectedWidget && (
+      ) : (
+        /* Global suggestions when nothing selected */
         <div className="px-4 pb-3 flex-shrink-0">
           <p className="text-[10px] text-slate-400 uppercase tracking-wide font-medium mb-2">Try asking…</p>
           <div className="flex flex-wrap gap-2">
@@ -392,8 +402,31 @@ export default function ChatPane({
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
-function buildFallback(text: string, selectedWidget: WidgetContext | null): string {
-  const ctx = selectedWidget ? ` for **${selectedWidget.label}**` : '';
+function WidgetChip({ label, isActive, onRemove }: { label: string; isActive: boolean; onRemove: () => void }) {
+  return (
+    <div className={`flex items-center justify-between gap-2 px-3 py-2 rounded-xl transition-colors ${
+      isActive ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700'
+    }`}>
+      <div className="flex items-center gap-2 min-w-0">
+        <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${isActive ? 'bg-fuchsia-400' : 'bg-fuchsia-500'}`} />
+        <span className="text-xs font-medium truncate">{label}</span>
+      </div>
+      <button
+        onClick={onRemove}
+        className={`w-4 h-4 flex-shrink-0 flex items-center justify-center rounded-full transition-colors ${
+          isActive ? 'text-slate-400 hover:text-white' : 'text-slate-400 hover:text-slate-700'
+        }`}
+      >
+        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+    </div>
+  );
+}
+
+function buildFallback(text: string, primaryWidget: WidgetContext | null): string {
+  const ctx = primaryWidget ? ` for **${primaryWidget.label}**` : '';
   return (
     `I can't do "${text}"${ctx} yet — here's what I can help with:\n` +
     `• **Chart type** — "change to bar chart" / "switch to line chart"\n` +
@@ -416,31 +449,6 @@ function SuggestionPill({ label, onSend }: { label: string; onSend: (t: string) 
   );
 }
 
-function MiniChartSVG() {
-  return (
-    <svg viewBox="0 0 200 56" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
-      <path
-        d="M0 46 C30 40 55 32 80 28 C110 23 150 21 200 16 L200 56 L0 56 Z"
-        fill="#c0392b"
-        fillOpacity="0.08"
-      />
-      <path
-        d="M0 46 C30 40 55 32 80 28 C110 23 150 21 200 16"
-        stroke="#c0392b"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-      <path
-        d="M0 51 C40 50 80 49 120 49 C150 49 175 50 200 51"
-        stroke="#94a3b8"
-        strokeWidth="1.5"
-        strokeDasharray="5 3"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-
 function StarIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 16 16" fill="currentColor">
@@ -452,11 +460,7 @@ function StarIcon({ className }: { className?: string }) {
 function PaperclipIcon({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"
-      />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
     </svg>
   );
 }
@@ -464,9 +468,7 @@ function PaperclipIcon({ className }: { className?: string }) {
 function DotsIcon({ className }: { className?: string }) {
   return (
     <svg className={className} fill="currentColor" viewBox="0 0 24 24">
-      <circle cx="5" cy="12" r="2" />
-      <circle cx="12" cy="12" r="2" />
-      <circle cx="19" cy="12" r="2" />
+      <circle cx="5" cy="12" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="19" cy="12" r="2" />
     </svg>
   );
 }

@@ -34,7 +34,7 @@ export default function Dashboard({ isPreview = false, noSidebar = false, teamId
   const [selectedYear, setSelectedYear] = useState(data.seasons[data.seasons.length - 1].year);
   const [chartMetric, setChartMetric] = useState<ChartMetric>('ppg');
   const [highlightedPlayer, setHighlightedPlayer] = useState<string | null>(null);
-  const [selectedWidget, setSelectedWidget] = useState<string | null>(null);
+  const [selectedWidgets, setSelectedWidgets] = useState<string[]>([]);
   const [chatOpen, setChatOpen] = useState(true);
   const [trendChartType, setTrendChartType] = useState<'line' | 'bar'>('line');
   const [compChartType, setCompChartType] = useState<'bar' | 'line'>('bar');
@@ -43,15 +43,20 @@ export default function Dashboard({ isPreview = false, noSidebar = false, teamId
   const [accentColor, setAccentColor] = useState<string>('#3b82f6');
   const [widgetTitles, setWidgetTitles] = useState<Record<string, string>>({});
 
-  const handleWidgetSelect = (id: string) => {
-    setSelectedWidget(prev => (prev === id ? null : id));
+  const handleWidgetSelect = (id: string, shiftKey = false) => {
+    setSelectedWidgets(prev => {
+      if (shiftKey) {
+        return prev.includes(id) ? prev.filter(w => w !== id) : [...prev, id];
+      }
+      return prev.length === 1 && prev[0] === id ? [] : [id];
+    });
   };
 
   // Reset all editable state whenever teamId changes
   useEffect(() => {
     setSelectedYear(data.seasons[data.seasons.length - 1].year);
     setHighlightedPlayer(null);
-    setSelectedWidget(null);
+    setSelectedWidgets([]);
     setTrendChartType('line');
     setCompChartType('bar');
     setLeaderboardSort('ppg');
@@ -73,9 +78,10 @@ export default function Dashboard({ isPreview = false, noSidebar = false, teamId
     return highlightedPlayer;
   }, [highlightedPlayer, season]);
 
-  const widgetContext: WidgetContext | null = selectedWidget
-    ? { id: selectedWidget, ...(WIDGET_META[selectedWidget] ?? { label: selectedWidget, isChart: false }) }
-    : null;
+  const widgetContexts: WidgetContext[] = selectedWidgets.map(id => ({
+    id,
+    ...(WIDGET_META[id] ?? { label: id, isChart: false }),
+  }));
 
   const handleCommand = (cmd: ParsedCommand) => {
     switch (cmd.type) {
@@ -185,13 +191,13 @@ export default function Dashboard({ isPreview = false, noSidebar = false, teamId
         </header>
 
         {/* Deselect on background click */}
-        <div className="px-8 py-6 space-y-6" onClick={() => setSelectedWidget(null)}>
-          <SelectableWidget id="stats" selectedId={selectedWidget} onSelect={handleWidgetSelect}>
+        <div className="px-8 py-6 space-y-6" onClick={() => setSelectedWidgets([])}>
+          <SelectableWidget id="stats" selectedIds={selectedWidgets} onSelect={handleWidgetSelect}>
             <StatsBar season={season} />
           </SelectableWidget>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <SelectableWidget id="trend-chart" selectedId={selectedWidget} onSelect={handleWidgetSelect}>
+            <SelectableWidget id="trend-chart" selectedIds={selectedWidgets} onSelect={handleWidgetSelect}>
               <TrendChart
                 seasons={data.seasons}
                 metric={chartMetric}
@@ -200,7 +206,7 @@ export default function Dashboard({ isPreview = false, noSidebar = false, teamId
                 title={widgetTitles['trend-chart']}
               />
             </SelectableWidget>
-            <SelectableWidget id="comparison-chart" selectedId={selectedWidget} onSelect={handleWidgetSelect}>
+            <SelectableWidget id="comparison-chart" selectedIds={selectedWidgets} onSelect={handleWidgetSelect}>
               <ComparisonChart
                 season={season}
                 metric={chartMetric}
@@ -212,7 +218,7 @@ export default function Dashboard({ isPreview = false, noSidebar = false, teamId
             </SelectableWidget>
           </div>
 
-          <SelectableWidget id="player-cards" selectedId={selectedWidget} onSelect={handleWidgetSelect}>
+          <SelectableWidget id="player-cards" selectedIds={selectedWidgets} onSelect={handleWidgetSelect}>
             <div className="bg-white rounded-xl border border-slate-200 p-5">
               <h2 className="text-slate-800 font-bold text-sm uppercase tracking-wider mb-3">
                 Top Performers · {season.year}
@@ -220,13 +226,13 @@ export default function Dashboard({ isPreview = false, noSidebar = false, teamId
               <PlayerCards
                 players={season.players}
                 highlightedPlayer={resolvedHighlight}
-                selectedWidgetId={selectedWidget}
+                selectedWidgetIds={selectedWidgets}
                 onWidgetSelect={handleWidgetSelect}
               />
             </div>
           </SelectableWidget>
 
-          <SelectableWidget id="leaderboard" selectedId={selectedWidget} onSelect={handleWidgetSelect}>
+          <SelectableWidget id="leaderboard" selectedIds={selectedWidgets} onSelect={handleWidgetSelect}>
             <div className="bg-white rounded-xl border border-slate-200 p-5">
               <div className="flex items-center justify-between mb-3">
                 <h2 className="text-slate-800 font-bold text-sm uppercase tracking-wider">
@@ -266,8 +272,8 @@ export default function Dashboard({ isPreview = false, noSidebar = false, teamId
             onClose={() => setChatOpen(false)}
             chartMetric={chartMetric}
             highlightedPlayer={resolvedHighlight}
-            selectedWidget={widgetContext}
-            onClearWidget={() => setSelectedWidget(null)}
+            selectedWidgets={widgetContexts}
+            onClearWidget={(id) => setSelectedWidgets(prev => prev.filter(w => w !== id))}
           />
         </div>
       )}
