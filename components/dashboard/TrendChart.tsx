@@ -121,17 +121,9 @@ export default function TrendChart({
             {METRIC_LABELS[metric]} — Top 5 players over 5 seasons
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <span
-            className="text-xs font-medium px-2 py-0.5 rounded-full capitalize"
-            style={{ background: `${accentColor}20`, color: accentColor }}
-          >
-            {chartType}
-          </span>
-          <span className="text-xs font-medium px-2.5 py-1 rounded-md bg-accent text-primary">
-            {METRIC_LABELS[metric]}
-          </span>
-        </div>
+        <span className="text-xs font-medium px-2.5 py-1 rounded-md bg-accent text-primary">
+          {METRIC_LABELS[metric]}
+        </span>
       </div>
       <ReactECharts option={option} style={{ height: 280 }} notMerge />
     </div>

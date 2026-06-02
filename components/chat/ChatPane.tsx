@@ -156,6 +156,13 @@ function parseCommand(
 const MAX_VISIBLE_CHIPS = 3;
 let msgIdCounter = 10;
 
+const EMPTY_SUGGESTIONS = [
+  'What is the 3-point shooting percentage for conference losses?',
+  'What is the assist-to-turnover ratio for wins?',
+  'Change charts to line charts',
+  'Highlight the top scorer',
+];
+
 export default function ChatPane({
   onCommand,
   onClose,
@@ -190,6 +197,7 @@ export default function ChatPane({
 
   const visibleChips = selectedWidgets.slice(0, MAX_VISIBLE_CHIPS);
   const overflowCount = Math.max(0, selectedWidgets.length - MAX_VISIBLE_CHIPS);
+  const isEmptyState = messages.length === 1 && messages[0].role === 'assistant';
 
   const sendMessage = async (text: string) => {
     if (!text.trim()) return;
@@ -243,44 +251,63 @@ export default function ChatPane({
         </div>
       </div>
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3 min-h-0">
-        {messages.map(msg => (
-          <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            {msg.role === 'assistant' && (
+      {/* Messages / empty state */}
+      {isEmptyState ? (
+        <div className="flex-1 flex flex-col items-center justify-center px-6 pb-4 min-h-0">
+          <h2 className="text-2xl font-semibold text-slate-800 text-center mb-5">
+            Jump into the data…
+          </h2>
+          <div className="w-full space-y-2.5">
+            {EMPTY_SUGGESTIONS.map(s => (
+              <button
+                key={s}
+                onClick={() => sendMessage(s)}
+                className="w-full text-left px-4 py-3.5 rounded-2xl bg-violet-100 hover:bg-violet-200 text-slate-700 text-sm leading-snug transition-colors"
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3 min-h-0">
+          {messages.map(msg => (
+            <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+              {msg.role === 'assistant' && (
+                <div className="w-6 h-6 rounded-full bg-slate-900 flex items-center justify-center flex-shrink-0 mr-2 mt-0.5">
+                  <StarIcon className="w-3 h-3 text-white" />
+                </div>
+              )}
+              <div
+                className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${
+                  msg.role === 'user'
+                    ? 'bg-slate-900 text-white rounded-tr-sm'
+                    : 'bg-slate-100 text-slate-800 rounded-tl-sm'
+                }`}
+              >
+                <FormattedText text={msg.text} />
+              </div>
+            </div>
+          ))}
+
+          {isTyping && (
+            <div className="flex justify-start">
               <div className="w-6 h-6 rounded-full bg-slate-900 flex items-center justify-center flex-shrink-0 mr-2 mt-0.5">
                 <StarIcon className="w-3 h-3 text-white" />
               </div>
-            )}
-            <div
-              className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${
-                msg.role === 'user'
-                  ? 'bg-slate-900 text-white rounded-tr-sm'
-                  : 'bg-slate-100 text-slate-800 rounded-tl-sm'
-              }`}
-            >
-              <FormattedText text={msg.text} />
+              <div className="bg-slate-100 rounded-2xl rounded-tl-sm px-4 py-3 flex items-center gap-1.5">
+                {[0, 1, 2].map(i => (
+                  <div key={i} className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: `${i * 120}ms` }} />
+                ))}
+              </div>
             </div>
-          </div>
-        ))}
-
-        {isTyping && (
-          <div className="flex justify-start">
-            <div className="w-6 h-6 rounded-full bg-slate-900 flex items-center justify-center flex-shrink-0 mr-2 mt-0.5">
-              <StarIcon className="w-3 h-3 text-white" />
-            </div>
-            <div className="bg-slate-100 rounded-2xl rounded-tl-sm px-4 py-3 flex items-center gap-1.5">
-              {[0, 1, 2].map(i => (
-                <div key={i} className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: `${i * 120}ms` }} />
-              ))}
-            </div>
-          </div>
-        )}
-        <div ref={bottomRef} />
-      </div>
+          )}
+          <div ref={bottomRef} />
+        </div>
+      )}
 
       {/* Widget context + suggestions */}
-      {selectedWidgets.length > 0 ? (
+      {selectedWidgets.length > 0 && (
         <div className="px-4 py-3 border-t border-slate-100 flex-shrink-0">
           {/* Stacked chips — max 3 visible */}
           <div className="space-y-1.5">
@@ -360,25 +387,11 @@ export default function ChatPane({
             )}
           </div>
         </div>
-      ) : (
-        /* Global suggestions when nothing selected */
-        <div className="px-4 pb-3 flex-shrink-0">
-          <p className="text-[10px] text-slate-400 uppercase tracking-wide font-medium mb-2">Try asking…</p>
-          <div className="flex flex-wrap gap-2">
-            <SuggestionPill label="Show rebounds" onSend={sendMessage} />
-            <SuggestionPill label="Highlight top scorer" onSend={sendMessage} />
-            <SuggestionPill label="Sort by assists" onSend={sendMessage} />
-            <SuggestionPill label="Use ISU red" onSend={sendMessage} />
-          </div>
-        </div>
       )}
 
       {/* Input */}
       <div className="px-4 pb-4 pt-2 flex-shrink-0 border-t border-slate-100">
         <div className="flex items-center gap-2 bg-slate-100 rounded-2xl px-3 py-2.5">
-          <button className="w-7 h-7 rounded-full bg-white shadow-sm flex items-center justify-center flex-shrink-0 text-slate-500 hover:text-slate-700 transition-colors">
-            <StarIcon className="w-3.5 h-3.5" />
-          </button>
           <input
             ref={inputRef}
             type="text"
@@ -407,10 +420,7 @@ function WidgetChip({ label, isActive, onRemove }: { label: string; isActive: bo
     <div className={`flex items-center justify-between gap-2 px-3 py-2 rounded-xl transition-colors ${
       isActive ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700'
     }`}>
-      <div className="flex items-center gap-2 min-w-0">
-        <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${isActive ? 'bg-fuchsia-400' : 'bg-fuchsia-500'}`} />
-        <span className="text-xs font-medium truncate">{label}</span>
-      </div>
+      <span className="text-xs font-medium truncate min-w-0">{label}</span>
       <button
         onClick={onRemove}
         className={`w-4 h-4 flex-shrink-0 flex items-center justify-center rounded-full transition-colors ${

@@ -106,17 +106,9 @@ export default function ComparisonChart({
             {season.year} · {METRIC_LABELS[metric]}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <span
-            className="text-xs font-medium px-2 py-0.5 rounded-full capitalize"
-            style={{ background: `${accentColor}20`, color: accentColor }}
-          >
-            {chartType}
-          </span>
-          <span className="text-xs font-semibold px-2 py-1 rounded-md bg-slate-100 text-slate-600">
-            {METRIC_SHORT[metric]}
-          </span>
-        </div>
+        <span className="text-xs font-semibold px-2 py-1 rounded-md bg-slate-100 text-slate-600">
+          {METRIC_SHORT[metric]}
+        </span>
       </div>
       <ReactECharts option={option} style={{ height: 260 }} notMerge />
     </div>
