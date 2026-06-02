@@ -2,26 +2,35 @@
 
 import { useState, useMemo } from 'react';
 import cyclonesData from '@/data/cyclones.json';
+import TEAMS from '@/data/teams';
 import StatsBar from './StatsBar';
 import LeaderboardTable from './LeaderboardTable';
 import TrendChart from './TrendChart';
 import ComparisonChart from './ComparisonChart';
 import PlayerCards from './PlayerCards';
+import SelectableWidget from './SelectableWidget';
 import ChatPane, { type ParsedCommand } from '@/components/chat/ChatPane';
 import type { CyclonesData, ChartMetric } from './types';
 
-const data = cyclonesData as CyclonesData;
+const fallbackData = cyclonesData as CyclonesData;
 
 interface Props {
   isPreview?: boolean;
   noSidebar?: boolean;
+  teamId?: string;
 }
 
-export default function Dashboard({ isPreview = false, noSidebar = false }: Props) {
+export default function Dashboard({ isPreview = false, noSidebar = false, teamId }: Props) {
+  const data = (teamId && TEAMS[teamId]) ? TEAMS[teamId] : fallbackData;
   const [selectedYear, setSelectedYear] = useState(data.seasons[data.seasons.length - 1].year);
   const [chartMetric, setChartMetric] = useState<ChartMetric>('ppg');
   const [highlightedPlayer, setHighlightedPlayer] = useState<string | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
+  const [selectedWidget, setSelectedWidget] = useState<string | null>(null);
+
+  const handleWidgetSelect = (id: string) => {
+    setSelectedWidget(prev => (prev === id ? null : id));
+  };
 
   const season = useMemo(
     () => data.seasons.find(s => s.year === selectedYear) ?? data.seasons[data.seasons.length - 1],
@@ -128,7 +137,7 @@ export default function Dashboard({ isPreview = false, noSidebar = false }: Prop
               </svg>
             </div>
             <div>
-              <h1 className="text-slate-900 font-bold text-lg leading-tight">Basketball Analytics</h1>
+              <h1 className="text-slate-900 font-bold text-lg leading-tight">{data.team}</h1>
               <p className="text-slate-400 text-xs">{season.year} Season</p>
             </div>
           </div>
@@ -174,49 +183,64 @@ export default function Dashboard({ isPreview = false, noSidebar = false }: Prop
           </div>
         </header>
 
-        {/* Dashboard content */}
-        <div className="px-8 py-6 space-y-6">
+        {/* Deselect on background click */}
+        <div className="px-8 py-6 space-y-6" onClick={() => setSelectedWidget(null)}>
           {/* Stats summary bar */}
-          <StatsBar season={season} />
+          <SelectableWidget id="stats" selectedId={selectedWidget} onSelect={handleWidgetSelect}>
+            <StatsBar season={season} />
+          </SelectableWidget>
 
           {/* Charts row */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <TrendChart seasons={data.seasons} metric={chartMetric} />
-            <ComparisonChart season={season} metric={chartMetric} highlightedPlayer={resolvedHighlight} />
+            <SelectableWidget id="trend-chart" selectedId={selectedWidget} onSelect={handleWidgetSelect}>
+              <TrendChart seasons={data.seasons} metric={chartMetric} />
+            </SelectableWidget>
+            <SelectableWidget id="comparison-chart" selectedId={selectedWidget} onSelect={handleWidgetSelect}>
+              <ComparisonChart season={season} metric={chartMetric} highlightedPlayer={resolvedHighlight} />
+            </SelectableWidget>
           </div>
 
           {/* Player cards */}
-          <div>
-            <h2 className="text-slate-800 font-bold text-sm uppercase tracking-wider mb-3">
-              Top Performers · {season.year}
-            </h2>
-            <PlayerCards players={season.players} highlightedPlayer={resolvedHighlight} />
-          </div>
+          <SelectableWidget id="player-cards" selectedId={selectedWidget} onSelect={handleWidgetSelect}>
+            <div className="bg-white rounded-xl border border-slate-200 p-5">
+              <h2 className="text-slate-800 font-bold text-sm uppercase tracking-wider mb-3">
+                Top Performers · {season.year}
+              </h2>
+              <PlayerCards
+                players={season.players}
+                highlightedPlayer={resolvedHighlight}
+                selectedWidgetId={selectedWidget}
+                onWidgetSelect={handleWidgetSelect}
+              />
+            </div>
+          </SelectableWidget>
 
           {/* Leaderboard */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-slate-800 font-bold text-sm uppercase tracking-wider">
-                Player Leaderboard
-              </h2>
-              {resolvedHighlight && (
-                <button
-                  onClick={() => setHighlightedPlayer(null)}
-                  className="text-xs text-slate-400 hover:text-slate-600 flex items-center gap-1"
-                >
-                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                  Clear highlight
-                </button>
-              )}
+          <SelectableWidget id="leaderboard" selectedId={selectedWidget} onSelect={handleWidgetSelect}>
+            <div className="bg-white rounded-xl border border-slate-200 p-5">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-slate-800 font-bold text-sm uppercase tracking-wider">
+                  Player Leaderboard
+                </h2>
+                {resolvedHighlight && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setHighlightedPlayer(null); }}
+                    className="text-xs text-slate-400 hover:text-slate-600 flex items-center gap-1"
+                  >
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                    Clear highlight
+                  </button>
+                )}
+              </div>
+              <LeaderboardTable
+                players={season.players}
+                highlightedPlayer={resolvedHighlight}
+                chartMetric={chartMetric}
+              />
             </div>
-            <LeaderboardTable
-              players={season.players}
-              highlightedPlayer={resolvedHighlight}
-              chartMetric={chartMetric}
-            />
-          </div>
+          </SelectableWidget>
 
           <div className="h-4" />
         </div>

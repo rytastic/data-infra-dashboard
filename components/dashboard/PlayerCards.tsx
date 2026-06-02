@@ -1,47 +1,45 @@
 'use client';
 
 import type { Player } from './types';
+import SelectableWidget from './SelectableWidget';
 
 interface Props {
   players: Player[];
   highlightedPlayer: string | null;
+  selectedWidgetId?: string | null;
+  onWidgetSelect?: (id: string) => void;
 }
 
 const MEDALS = ['🥇', '🥈', '🥉'];
 
-export default function PlayerCards({ players, highlightedPlayer }: Props) {
+export default function PlayerCards({ players, highlightedPlayer, selectedWidgetId, onWidgetSelect }: Props) {
   const top3 = [...players].sort((a, b) => b.ppg - a.ppg).slice(0, 3);
-  const accentGrad = 'from-blue-50 to-blue-50/30 border-blue-200';
-  const accentText = 'text-[#3b82f6]';
-  const accentBadge = 'bg-[#3b82f6] text-white';
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
       {top3.map((player, i) => {
         const isHighlighted = highlightedPlayer !== null &&
           player.name.toLowerCase().includes(highlightedPlayer.toLowerCase());
+        const widgetId = `player-${player.name.replace(/\s+/g, '-').toLowerCase()}`;
 
         return (
-          <div
+          <SelectableWidget
             key={player.name}
-            className={`rounded-xl border p-5 transition-all duration-300 ${
-              isHighlighted || i === 0
-                ? `bg-gradient-to-br ${accentGrad} shadow-md`
-                : 'bg-white border-slate-200'
-            }`}
+            id={widgetId}
+            selectedId={selectedWidgetId ?? null}
+            onSelect={(id) => onWidgetSelect?.(id)}
+          >
+          <div
+            className="rounded-xl border bg-white border-slate-200 p-5 transition-all duration-300"
           >
             {/* Header */}
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center gap-3">
-                <div className={`w-11 h-11 rounded-full flex items-center justify-center text-lg font-bold ${
-                  i === 0 ? accentBadge : 'bg-slate-100 text-slate-600'
-                }`}>
+                <div className="w-11 h-11 rounded-full flex items-center justify-center text-lg font-bold bg-slate-100 text-slate-600">
                   {player.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
                 </div>
                 <div>
-                  <p className={`font-bold text-sm ${isHighlighted || i === 0 ? accentText : 'text-slate-800'}`}>
-                    {player.name}
-                  </p>
+                  <p className="font-bold text-sm text-slate-800">{player.name}</p>
                   <p className="text-slate-400 text-xs">{player.position} · {player.games}G played</p>
                 </div>
               </div>
@@ -49,10 +47,8 @@ export default function PlayerCards({ players, highlightedPlayer }: Props) {
             </div>
 
             {/* Primary stat */}
-            <div className="text-center py-3 mb-4 rounded-lg bg-white/60 border border-white/40">
-              <p className={`text-3xl font-black ${i === 0 ? accentText : 'text-slate-800'}`}>
-                {player.ppg.toFixed(1)}
-              </p>
+            <div className="text-center py-3 mb-4 rounded-lg bg-slate-50 border border-slate-100">
+              <p className="text-3xl font-black text-slate-800">{player.ppg.toFixed(1)}</p>
               <p className="text-slate-400 text-xs font-medium uppercase tracking-wide">Points per game</p>
             </div>
 
@@ -72,6 +68,7 @@ export default function PlayerCards({ players, highlightedPlayer }: Props) {
               </div>
             )}
           </div>
+          </SelectableWidget>
         );
       })}
     </div>
@@ -80,7 +77,7 @@ export default function PlayerCards({ players, highlightedPlayer }: Props) {
 
 function StatPill({ label, value }: { label: string; value: string }) {
   return (
-    <div className="bg-white/50 rounded-lg p-2 text-center">
+    <div className="bg-slate-50 rounded-lg p-2 text-center">
       <p className="text-slate-700 text-xs font-bold">{value}</p>
       <p className="text-slate-400 text-[10px] uppercase tracking-wide">{label}</p>
     </div>

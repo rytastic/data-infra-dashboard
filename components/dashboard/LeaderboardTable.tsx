@@ -58,7 +58,7 @@ export default function LeaderboardTable({ players, highlightedPlayer, chartMetr
   const highlightCol = metricToColumn[chartMetric];
 
   return (
-    <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+    <div className="rounded-xl overflow-hidden border border-slate-100">
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>

@@ -6,7 +6,7 @@ const ALL_SOURCES = [
   { id: 's1',  title: 'Cyclone basketball 2020-21',         subtitle: 'Men + Women full season with roster',       chipLabel: 'Cyclone basketball 2020-21',            defaultChecked: false },
   { id: 's2',  title: 'Cyclone basketball 2022-23',         subtitle: 'Men + Women full season with roster',       chipLabel: 'Cyclone basketball 2022-23',            defaultChecked: false },
   { id: 's3',  title: 'Kansas basketball 2024-25',          subtitle: 'Roster only',                               chipLabel: 'Kansas basketball 2024-25',             defaultChecked: false },
-  { id: 's4',  title: 'Cyclone basketball 2022-23',         subtitle: 'Non-conference opponents',                  chipLabel: 'Cyclone basketball (non-con) 2022-23',  defaultChecked: true  },
+  { id: 's4',  title: 'Cyclone basketball 2022-23',         subtitle: 'Non-conference opponents',                  chipLabel: 'Cyclone basketball (non-con) 2022-23',  defaultChecked: false },
   { id: 's5',  title: 'Duke Blue Devils 2023-24',           subtitle: 'Full season with roster and play-by-play',  chipLabel: 'Duke basketball 2023-24',               defaultChecked: false },
   { id: 's6',  title: 'Kentucky Wildcats 2023-24',          subtitle: 'Full season with roster',                   chipLabel: 'Kentucky basketball 2023-24',           defaultChecked: false },
   { id: 's7',  title: 'North Carolina Tar Heels 2022-23',   subtitle: 'Full season stats',                         chipLabel: 'UNC basketball 2022-23',                defaultChecked: false },

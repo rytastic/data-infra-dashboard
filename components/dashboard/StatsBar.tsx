@@ -13,12 +13,8 @@ export default function StatsBar({ season }: Props) {
   const [wins, losses] = season.record.split('-').map(Number);
   const winPct = ((wins / (wins + losses)) * 100).toFixed(0);
 
-  const accent = 'text-[#3b82f6]';
-  const accentBg = 'bg-[#3b82f6]/10';
-  const accentBorder = 'border-[#3b82f6]/20';
-
   const stats = [
-    { label: 'Team Record', value: season.record, sub: `${winPct}% win rate`, highlight: true },
+    { label: 'Team Record', value: season.record, sub: `${winPct}% win rate` },
     { label: 'Avg Points', value: season.avgPoints.toFixed(1), sub: 'per game' },
     { label: 'Conf. Rank', value: `#${season.conferenceRank}`, sub: 'Big 12' },
     { label: 'Top Scorer', value: topScorer?.ppg.toFixed(1) ?? '—', sub: topScorer?.name ?? '—' },
@@ -31,16 +27,10 @@ export default function StatsBar({ season }: Props) {
       {stats.map((s) => (
         <div
           key={s.label}
-          className={`rounded-xl border p-4 ${
-            s.highlight
-              ? `${accentBg} ${accentBorder}`
-              : 'bg-white border-slate-200'
-          }`}
+          className="rounded-xl border bg-white border-slate-200 p-4"
         >
           <p className="text-slate-500 text-xs font-medium uppercase tracking-wide mb-1">{s.label}</p>
-          <p className={`text-2xl font-bold leading-none mb-1 ${s.highlight ? accent : 'text-slate-900'}`}>
-            {s.value}
-          </p>
+          <p className="text-2xl font-bold leading-none mb-1 text-slate-900">{s.value}</p>
           <p className="text-slate-400 text-xs truncate">{s.sub}</p>
         </div>
       ))}

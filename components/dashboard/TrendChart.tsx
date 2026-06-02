@@ -78,7 +78,7 @@ export default function TrendChart({ seasons, metric }: Props) {
   };
 
   return (
-    <div className="bg-card border border-border rounded-xl p-5">
+    <div className="bg-white border border-slate-200 rounded-xl p-5">
       <div className="flex items-center justify-between mb-4">
         <div>
           <h3 className="text-foreground font-semibold text-sm">Season Trend</h3>

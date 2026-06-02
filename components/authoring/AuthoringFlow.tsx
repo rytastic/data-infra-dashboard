@@ -28,8 +28,8 @@ const BASE_SECTIONS: NavSection[] = [
     id: 's25',
     label: '25 Big 12 🏀 tournament',
     items: [
-      { id: 'iowa-state', label: 'Iowa State' },
-      { id: 'texas-tech', label: 'Texas Tech' },
+      { id: 'p-iowa-state', label: 'Label', isPlaceholder: true },
+      { id: 'p-texas-tech', label: 'Label', isPlaceholder: true },
     ],
   },
   {
@@ -44,10 +44,36 @@ const BASE_SECTIONS: NavSection[] = [
 ];
 
 const ALL_SOURCES = [
-  { id: 's1', label: 'Cyclone basketball 2020-21' },
-  { id: 's2', label: 'Cyclone basketball 2022-23' },
-  { id: 's3', label: 'Kansas basketball 2024-25' },
-  { id: 's4', label: 'Cyclone basketball (non-con) 2022-23' },
+  { id: 's1',  label: 'Cyclone basketball 2020-21' },
+  { id: 's2',  label: 'Cyclone basketball 2022-23' },
+  { id: 's3',  label: 'Kansas basketball 2024-25' },
+  { id: 's4',  label: 'Cyclone basketball (non-con) 2022-23' },
+  { id: 's5',  label: 'Duke basketball 2023-24' },
+  { id: 's6',  label: 'Kentucky basketball 2023-24' },
+  { id: 's7',  label: 'UNC basketball 2022-23' },
+  { id: 's8',  label: 'Gonzaga basketball 2023-24' },
+  { id: 's9',  label: 'Houston basketball 2023-24' },
+  { id: 's10', label: 'Kansas basketball 2023-24' },
+  { id: 's11', label: 'Baylor basketball 2023-24' },
+  { id: 's12', label: 'TCU basketball 2023-24' },
+  { id: 's13', label: 'Arizona basketball 2022-23' },
+  { id: 's14', label: 'Purdue basketball 2023-24' },
+  { id: 's15', label: 'Tennessee basketball 2023-24' },
+  { id: 's16', label: 'UConn basketball 2023-24' },
+  { id: 's17', label: 'Alabama basketball 2023-24' },
+  { id: 's18', label: 'Marquette basketball 2023-24' },
+  { id: 's19', label: 'Creighton basketball 2023-24' },
+  { id: 's20', label: 'UCLA basketball 2022-23' },
+  { id: 's21', label: 'Indiana basketball 2022-23' },
+  { id: 's22', label: 'Michigan basketball 2023-24' },
+  { id: 's23', label: 'SDSU basketball 2022-23' },
+  { id: 's24', label: 'Iowa State basketball 2021-22' },
+  { id: 's25', label: 'Texas Tech basketball 2023-24' },
+  { id: 's26', label: 'Big 12 2023-24' },
+  { id: 's27', label: 'NCAA Tournament 2024' },
+  { id: 's28', label: 'Villanova basketball 2022-23' },
+  { id: 's29', label: 'FAU basketball 2022-23' },
+  { id: 's30', label: 'Arkansas basketball 2022-23' },
 ];
 
 const DATASOURCE_CHIPS = [
@@ -159,7 +185,7 @@ export default function AuthoringFlow() {
         className="flex-1 flex flex-col min-h-0 overflow-hidden"
         style={{ background: '#f1f5f9' }}
       >
-        {step === 'dashboard' && <Dashboard noSidebar />}
+        {step === 'dashboard' && <Dashboard noSidebar teamId={activeNavId} />}
 
         {isCreating(step) && (
           <>
