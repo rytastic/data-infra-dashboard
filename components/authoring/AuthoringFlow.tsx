@@ -6,12 +6,18 @@ import StepDataSource from './StepDataSource';
 import StepBreakdown from './StepBreakdown';
 import StepBuilding from './StepBuilding';
 import PromptInput from './PromptInput';
-import Dashboard from '@/components/dashboard/Dashboard';
+import Dashboard, { type DashboardLayout } from '@/components/dashboard/Dashboard';
 import TEAMS from '@/data/teams';
 
 type Step = 'dashboard' | 'datasource' | 'breakdown' | 'building';
 
 // Maps data source IDs to the TEAMS keys we have data for
+const BREAKDOWN_TO_LAYOUT: Record<string, DashboardLayout> = {
+  b1: 'player-comparison',
+  b2: 'overview',
+  b3: 'top-scorers',
+};
+
 const SOURCE_TO_TEAM: Record<string, string> = {
   's3':  'kansas',
   's9':  'houston',
@@ -113,6 +119,9 @@ export default function AuthoringFlow() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   // maps created nav item IDs to TEAMS keys so Dashboard knows which data to load
   const [navTeamOverrides, setNavTeamOverrides] = useState<Record<string, string>>({});
+  // maps created nav item IDs to dashboard layout
+  const [navLayoutOverrides, setNavLayoutOverrides] = useState<Record<string, DashboardLayout>>({});
+  const [selectedBreakdown, setSelectedBreakdown] = useState<string>('b3');
 
   const handleNewDash = () => {
     setSelectedSources([]);
@@ -188,6 +197,9 @@ export default function AuthoringFlow() {
       setNavTeamOverrides(prev => ({ ...prev, [navId]: teamId }));
     }
 
+    const dashLayout = BREAKDOWN_TO_LAYOUT[selectedBreakdown] ?? 'overview';
+    setNavLayoutOverrides(prev => ({ ...prev, [navId]: dashLayout }));
+
     setActiveNavId(navId);
     setSidebarCollapsed(false);
     setStep('dashboard');
@@ -212,6 +224,7 @@ export default function AuthoringFlow() {
           <Dashboard
             noSidebar
             teamId={navTeamOverrides[activeNavId] ?? activeNavId}
+            layout={navLayoutOverrides[activeNavId] ?? 'overview'}
             sectionTitle={sections.find(s => s.items.some(i => i.id === activeNavId))?.label}
           />
         )}
@@ -249,7 +262,7 @@ export default function AuthoringFlow() {
               )}
               {step === 'breakdown' && (
                 <StepBreakdown
-                  onSubmit={() => setStep('building')}
+                  onSubmit={(id) => { setSelectedBreakdown(id); setStep('building'); }}
                   onBack={() => setStep('datasource')}
                   onSelectionChange={setPromptInputValue}
                 />

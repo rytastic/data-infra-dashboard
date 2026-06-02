@@ -60,14 +60,17 @@ const WIDGET_META: Record<string, { label: string; isChart: boolean }> = {
   leaderboard: { label: 'Player Leaderboard', isChart: false },
 };
 
+export type DashboardLayout = 'overview' | 'player-comparison' | 'top-scorers';
+
 interface Props {
   isPreview?: boolean;
   noSidebar?: boolean;
   teamId?: string;
   sectionTitle?: string;
+  layout?: DashboardLayout;
 }
 
-export default function Dashboard({ isPreview = false, noSidebar = false, teamId, sectionTitle }: Props) {
+export default function Dashboard({ isPreview = false, noSidebar = false, teamId, sectionTitle, layout = 'overview' }: Props) {
   const data = (teamId && TEAMS[teamId]) ? TEAMS[teamId] : fallbackData;
   const [selectedYear, setSelectedYear] = useState(data.seasons[data.seasons.length - 1].year);
   const [chartMetric, setChartMetric] = useState<ChartMetric>('ppg');
@@ -327,73 +330,69 @@ export default function Dashboard({ isPreview = false, noSidebar = false, teamId
 
         {/* Deselect on background click */}
         <div className="px-8 py-6 space-y-6" onClick={() => setSelectedWidgets([])}>
-          <SelectableWidget id="stats" selectedIds={selectedWidgets} pendingIds={pendingWidgetIds} onSelect={handleWidgetSelect}>
-            <StatsBar season={season} />
-          </SelectableWidget>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <SelectableWidget id="trend-chart" selectedIds={selectedWidgets} pendingIds={pendingWidgetIds} onSelect={handleWidgetSelect}>
-              <TrendChart
-                seasons={data.seasons}
-                metric={chartMetric}
-                chartType={trendChartType}
-                accentColor={accentColor}
-                title={widgetTitles['trend-chart']}
-              />
-            </SelectableWidget>
-            <SelectableWidget id="comparison-chart" selectedIds={selectedWidgets} pendingIds={pendingWidgetIds} onSelect={handleWidgetSelect}>
-              <ComparisonChart
-                season={season}
-                metric={chartMetric}
-                highlightedPlayer={resolvedHighlight}
-                chartType={compChartType}
-                accentColor={accentColor}
-                title={widgetTitles['comparison-chart']}
-              />
-            </SelectableWidget>
-          </div>
-
-          <SelectableWidget id="player-cards" selectedIds={selectedWidgets} pendingIds={pendingWidgetIds} onSelect={handleWidgetSelect}>
-            <div className="bg-white rounded-xl border border-slate-200 p-5">
-              <h2 className="text-slate-800 font-bold text-sm uppercase tracking-wider mb-3">
-                Top Performers · {season.year}
-              </h2>
-              <PlayerCards
-                players={season.players}
-                highlightedPlayer={resolvedHighlight}
-                selectedWidgetIds={selectedWidgets}
-                onWidgetSelect={handleWidgetSelect}
-              />
-            </div>
-          </SelectableWidget>
-
-          <SelectableWidget id="leaderboard" selectedIds={selectedWidgets} pendingIds={pendingWidgetIds} onSelect={handleWidgetSelect}>
-            <div className="bg-white rounded-xl border border-slate-200 p-5">
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-slate-800 font-bold text-sm uppercase tracking-wider">
-                  Player Leaderboard
-                </h2>
-                {resolvedHighlight && (
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setHighlightedPlayer(null); }}
-                    className="text-xs text-slate-400 hover:text-slate-600 flex items-center gap-1"
-                  >
-                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                    Clear highlight
-                  </button>
-                )}
+          {/* ── OVERVIEW: stats → charts → player cards → leaderboard ── */}
+          {layout === 'overview' && (
+            <>
+              <SelectableWidget id="stats" selectedIds={selectedWidgets} pendingIds={pendingWidgetIds} onSelect={handleWidgetSelect}>
+                <StatsBar season={season} />
+              </SelectableWidget>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <SelectableWidget id="trend-chart" selectedIds={selectedWidgets} pendingIds={pendingWidgetIds} onSelect={handleWidgetSelect}>
+                  <TrendChart seasons={data.seasons} metric={chartMetric} chartType={trendChartType} accentColor={accentColor} title={widgetTitles['trend-chart']} />
+                </SelectableWidget>
+                <SelectableWidget id="comparison-chart" selectedIds={selectedWidgets} pendingIds={pendingWidgetIds} onSelect={handleWidgetSelect}>
+                  <ComparisonChart season={season} metric={chartMetric} highlightedPlayer={resolvedHighlight} chartType={compChartType} accentColor={accentColor} title={widgetTitles['comparison-chart']} />
+                </SelectableWidget>
               </div>
-              <LeaderboardTable
-                players={season.players}
-                highlightedPlayer={resolvedHighlight}
-                chartMetric={chartMetric}
-                externalSortKey={leaderboardSort}
-                limit={leaderboardLimit}
-              />
-            </div>
-          </SelectableWidget>
+              <SelectableWidget id="player-cards" selectedIds={selectedWidgets} pendingIds={pendingWidgetIds} onSelect={handleWidgetSelect}>
+                <div className="bg-white rounded-xl border border-slate-200 p-5">
+                  <h2 className="text-slate-800 font-bold text-sm uppercase tracking-wider mb-3">Top Performers · {season.year}</h2>
+                  <PlayerCards players={season.players} highlightedPlayer={resolvedHighlight} selectedWidgetIds={selectedWidgets} onWidgetSelect={handleWidgetSelect} />
+                </div>
+              </SelectableWidget>
+              <LeaderboardWidget season={season} selectedWidgets={selectedWidgets} pendingWidgetIds={pendingWidgetIds} handleWidgetSelect={handleWidgetSelect} resolvedHighlight={resolvedHighlight} setHighlightedPlayer={setHighlightedPlayer} chartMetric={chartMetric} leaderboardSort={leaderboardSort} leaderboardLimit={leaderboardLimit} />
+            </>
+          )}
+
+          {/* ── PLAYER-COMPARISON: leaderboard → player cards → bar chart ── */}
+          {layout === 'player-comparison' && (
+            <>
+              <LeaderboardWidget season={season} selectedWidgets={selectedWidgets} pendingWidgetIds={pendingWidgetIds} handleWidgetSelect={handleWidgetSelect} resolvedHighlight={resolvedHighlight} setHighlightedPlayer={setHighlightedPlayer} chartMetric={chartMetric} leaderboardSort={leaderboardSort} leaderboardLimit={leaderboardLimit} />
+              <SelectableWidget id="player-cards" selectedIds={selectedWidgets} pendingIds={pendingWidgetIds} onSelect={handleWidgetSelect}>
+                <div className="bg-white rounded-xl border border-slate-200 p-5">
+                  <h2 className="text-slate-800 font-bold text-sm uppercase tracking-wider mb-3">Top Performers · {season.year}</h2>
+                  <PlayerCards players={season.players} highlightedPlayer={resolvedHighlight} selectedWidgetIds={selectedWidgets} onWidgetSelect={handleWidgetSelect} />
+                </div>
+              </SelectableWidget>
+              <SelectableWidget id="comparison-chart" selectedIds={selectedWidgets} pendingIds={pendingWidgetIds} onSelect={handleWidgetSelect}>
+                <ComparisonChart season={season} metric={chartMetric} highlightedPlayer={resolvedHighlight} chartType="bar" accentColor={accentColor} title={widgetTitles['comparison-chart']} />
+              </SelectableWidget>
+            </>
+          )}
+
+          {/* ── TOP-SCORERS: stats → player cards → charts ── */}
+          {layout === 'top-scorers' && (
+            <>
+              <SelectableWidget id="stats" selectedIds={selectedWidgets} pendingIds={pendingWidgetIds} onSelect={handleWidgetSelect}>
+                <StatsBar season={season} />
+              </SelectableWidget>
+              <SelectableWidget id="player-cards" selectedIds={selectedWidgets} pendingIds={pendingWidgetIds} onSelect={handleWidgetSelect}>
+                <div className="bg-white rounded-xl border border-slate-200 p-5">
+                  <h2 className="text-slate-800 font-bold text-sm uppercase tracking-wider mb-3">Top Performers · {season.year}</h2>
+                  <PlayerCards players={season.players} highlightedPlayer={resolvedHighlight} selectedWidgetIds={selectedWidgets} onWidgetSelect={handleWidgetSelect} />
+                </div>
+              </SelectableWidget>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <SelectableWidget id="trend-chart" selectedIds={selectedWidgets} pendingIds={pendingWidgetIds} onSelect={handleWidgetSelect}>
+                  <TrendChart seasons={data.seasons} metric={chartMetric} chartType={trendChartType} accentColor={accentColor} title={widgetTitles['trend-chart']} />
+                </SelectableWidget>
+                <SelectableWidget id="comparison-chart" selectedIds={selectedWidgets} pendingIds={pendingWidgetIds} onSelect={handleWidgetSelect}>
+                  <ComparisonChart season={season} metric={chartMetric} highlightedPlayer={resolvedHighlight} chartType="bar" accentColor={accentColor} title={widgetTitles['comparison-chart']} />
+                </SelectableWidget>
+              </div>
+            </>
+          )}
 
           <div className="h-4" />
         </div>
@@ -416,6 +415,46 @@ export default function Dashboard({ isPreview = false, noSidebar = false, teamId
         </div>
       )}
     </div>
+  );
+}
+
+function LeaderboardWidget({ season, selectedWidgets, pendingWidgetIds, handleWidgetSelect, resolvedHighlight, setHighlightedPlayer, chartMetric, leaderboardSort, leaderboardLimit }: {
+  season: import('./types').Season;
+  selectedWidgets: string[];
+  pendingWidgetIds: string[];
+  handleWidgetSelect: (id: string, shiftKey: boolean) => void;
+  resolvedHighlight: string | null;
+  setHighlightedPlayer: (v: string | null) => void;
+  chartMetric: import('./types').ChartMetric;
+  leaderboardSort: string;
+  leaderboardLimit: number | null;
+}) {
+  return (
+    <SelectableWidget id="leaderboard" selectedIds={selectedWidgets} pendingIds={pendingWidgetIds} onSelect={handleWidgetSelect}>
+      <div className="bg-white rounded-xl border border-slate-200 p-5">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-slate-800 font-bold text-sm uppercase tracking-wider">Player Leaderboard</h2>
+          {resolvedHighlight && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setHighlightedPlayer(null); }}
+              className="text-xs text-slate-400 hover:text-slate-600 flex items-center gap-1"
+            >
+              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+              Clear highlight
+            </button>
+          )}
+        </div>
+        <LeaderboardTable
+          players={season.players}
+          highlightedPlayer={resolvedHighlight}
+          chartMetric={chartMetric}
+          externalSortKey={leaderboardSort}
+          limit={leaderboardLimit}
+        />
+      </div>
+    </SelectableWidget>
   );
 }
 

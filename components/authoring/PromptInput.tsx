@@ -225,6 +225,9 @@ export default function PromptInput({
 
       {/* Suggested prompts — full-width list, max 3, auto-submits */}
       <div className="mt-3 rounded-2xl overflow-hidden bg-white" style={{ border: '1px solid #e2e8f0' }}>
+        <div className="px-4 py-2.5 border-b border-[#f1f5f9]">
+          <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Suggested prompts</span>
+        </div>
         {chips.slice(0, 3).map((chip, i) => (
           <button
             key={chip}
