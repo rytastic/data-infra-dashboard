@@ -5,18 +5,15 @@ import { useState, useEffect } from 'react';
 const BUILD_STEPS = [
   { label: 'Selecting optimal layout',    icon: '🎨', duration: 800 },
   { label: 'Pulling data statistics',     icon: '📥', duration: 700 },
-  { label: 'Calculating averages',        icon: '🧮', duration: 600 },
   { label: 'Rendering trend chart',       icon: '📈', duration: 700 },
   { label: 'Building leaderboard',        icon: '📋', duration: 600 },
   { label: 'Generating comparison charts',icon: '📊', duration: 600 },
-  { label: 'Assembling data cards',       icon: '🃏', duration: 500 },
-  { label: 'Applying dashboard theme',    icon: '🎨', duration: 400 },
   { label: 'Final polish',                icon: '✨', duration: 500 },
 ];
 
 function DashboardIllustration() {
   return (
-    <svg viewBox="0 0 280 180" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: 280, height: 180 }}>
+    <svg viewBox="0 0 280 180" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: 200, height: 129 }}>
       {/* Background card */}
       <rect width="280" height="180" rx="12" fill="#f8fafc"/>
       <rect width="280" height="180" rx="12" fill="white" fillOpacity="0.6"/>
@@ -106,7 +103,7 @@ export default function StepBuilding({ onComplete }: { onComplete: () => void })
   return (
     <div className="w-full max-w-xl animate-fade-up">
       {/* Static dashboard illustration */}
-      <div className="flex justify-center mb-8">
+      <div className="flex justify-center mb-5">
         <div
           className="rounded-2xl overflow-hidden shadow-md"
           style={{ border: '1px solid #e2e8f0' }}
@@ -116,7 +113,7 @@ export default function StepBuilding({ onComplete }: { onComplete: () => void })
       </div>
 
       {/* Title + subtitle */}
-      <div className="text-center mb-8">
+      <div className="text-center mb-5">
         <h2 className="text-2xl font-normal text-foreground mb-2 tracking-[0px]">
           {done ? 'Dashboard Ready!' : 'Building your dashboard...'}
         </h2>

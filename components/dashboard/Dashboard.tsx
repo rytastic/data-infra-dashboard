@@ -371,17 +371,11 @@ export default function Dashboard({ isPreview = false, noSidebar = false, teamId
             </>
           )}
 
-          {/* ── TOP-SCORERS: stats → player cards → charts ── */}
+          {/* ── TOP-SCORERS: stats → charts → player cards ── */}
           {layout === 'top-scorers' && (
             <>
               <SelectableWidget id="stats" selectedIds={selectedWidgets} pendingIds={pendingWidgetIds} onSelect={handleWidgetSelect}>
                 <StatsBar season={season} />
-              </SelectableWidget>
-              <SelectableWidget id="player-cards" selectedIds={selectedWidgets} pendingIds={pendingWidgetIds} onSelect={handleWidgetSelect}>
-                <div className="bg-white rounded-xl border border-slate-200 p-5">
-                  <h2 className="text-slate-800 font-bold text-sm uppercase tracking-wider mb-3">Top Performers · {season.year}</h2>
-                  <PlayerCards players={season.players} highlightedPlayer={resolvedHighlight} selectedWidgetIds={selectedWidgets} onWidgetSelect={handleWidgetSelect} />
-                </div>
               </SelectableWidget>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <SelectableWidget id="trend-chart" selectedIds={selectedWidgets} pendingIds={pendingWidgetIds} onSelect={handleWidgetSelect}>
@@ -391,6 +385,12 @@ export default function Dashboard({ isPreview = false, noSidebar = false, teamId
                   <ComparisonChart season={season} metric={chartMetric} highlightedPlayer={resolvedHighlight} chartType="bar" accentColor={accentColor} title={widgetTitles['comparison-chart']} />
                 </SelectableWidget>
               </div>
+              <SelectableWidget id="player-cards" selectedIds={selectedWidgets} pendingIds={pendingWidgetIds} onSelect={handleWidgetSelect}>
+                <div className="bg-white rounded-xl border border-slate-200 p-5">
+                  <h2 className="text-slate-800 font-bold text-sm uppercase tracking-wider mb-3">Top Performers · {season.year}</h2>
+                  <PlayerCards players={season.players} highlightedPlayer={resolvedHighlight} selectedWidgetIds={selectedWidgets} onWidgetSelect={handleWidgetSelect} />
+                </div>
+              </SelectableWidget>
             </>
           )}
 
