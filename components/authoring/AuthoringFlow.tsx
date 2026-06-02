@@ -185,7 +185,13 @@ export default function AuthoringFlow() {
         className="flex-1 flex flex-col min-h-0 overflow-hidden"
         style={{ background: '#f1f5f9' }}
       >
-        {step === 'dashboard' && <Dashboard noSidebar teamId={activeNavId} />}
+        {step === 'dashboard' && (
+          <Dashboard
+            noSidebar
+            teamId={activeNavId}
+            sectionTitle={sections.find(s => s.items.some(i => i.id === activeNavId))?.label}
+          />
+        )}
 
         {isCreating(step) && (
           <>
