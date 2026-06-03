@@ -366,7 +366,7 @@ export default function Dashboard({ isPreview = false, noSidebar = false, teamId
                 </div>
               </SelectableWidget>
               <SelectableWidget id="comparison-chart" selectedIds={selectedWidgets} pendingIds={pendingWidgetIds} onSelect={handleWidgetSelect}>
-                <ComparisonChart season={season} metric={chartMetric} highlightedPlayer={resolvedHighlight} chartType="bar" accentColor={accentColor} title={widgetTitles['comparison-chart']} />
+                <ComparisonChart season={season} metric={chartMetric} highlightedPlayer={resolvedHighlight} chartType={compChartType} accentColor={accentColor} title={widgetTitles['comparison-chart']} />
               </SelectableWidget>
             </>
           )}
@@ -382,7 +382,7 @@ export default function Dashboard({ isPreview = false, noSidebar = false, teamId
                   <TrendChart seasons={data.seasons} metric={chartMetric} chartType={trendChartType} accentColor={accentColor} title={widgetTitles['trend-chart']} />
                 </SelectableWidget>
                 <SelectableWidget id="comparison-chart" selectedIds={selectedWidgets} pendingIds={pendingWidgetIds} onSelect={handleWidgetSelect}>
-                  <ComparisonChart season={season} metric={chartMetric} highlightedPlayer={resolvedHighlight} chartType="bar" accentColor={accentColor} title={widgetTitles['comparison-chart']} />
+                  <ComparisonChart season={season} metric={chartMetric} highlightedPlayer={resolvedHighlight} chartType={compChartType} accentColor={accentColor} title={widgetTitles['comparison-chart']} />
                 </SelectableWidget>
               </div>
               <SelectableWidget id="player-cards" selectedIds={selectedWidgets} pendingIds={pendingWidgetIds} onSelect={handleWidgetSelect}>
