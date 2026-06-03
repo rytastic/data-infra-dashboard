@@ -113,7 +113,7 @@ export default function TrendChart({
   };
 
   return (
-    <div className="bg-white border border-slate-200 rounded-xl p-5">
+    <div className="bg-white border border-slate-200 rounded-xl p-5 overflow-hidden">
       <div className="flex items-center justify-between mb-4">
         <div>
           <h3 className="text-foreground font-semibold text-sm">{title ?? 'Season Trend'}</h3>

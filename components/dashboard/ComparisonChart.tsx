@@ -98,7 +98,7 @@ export default function ComparisonChart({
   };
 
   return (
-    <div className="bg-white border border-slate-200 rounded-xl p-5">
+    <div className="bg-white border border-slate-200 rounded-xl p-5 overflow-hidden">
       <div className="flex items-center justify-between mb-5">
         <div>
           <h3 className="text-slate-800 font-semibold text-sm">{title ?? 'Player Comparison'}</h3>
