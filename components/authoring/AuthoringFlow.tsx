@@ -254,19 +254,6 @@ export default function AuthoringFlow() {
 
             {/* Step content + persistent input */}
             <div className="flex-1 flex flex-col items-center px-10 pb-6 overflow-y-auto">
-              {step === 'datasource' && (
-                <StepDataSource
-                  onNext={handleDataSourceNext}
-                  onSelectionChange={handleSelectionChange}
-                />
-              )}
-              {step === 'breakdown' && (
-                <StepBreakdown
-                  onSubmit={(id) => { setSelectedBreakdown(id); setStep('building'); }}
-                  onBack={() => setStep('datasource')}
-                  onSelectionChange={setPromptInputValue}
-                />
-              )}
               {step === 'building' && (
                 <div className="w-full max-w-[600px]">
                   <StepBuilding onComplete={handleBuildComplete} />
@@ -274,7 +261,26 @@ export default function AuthoringFlow() {
               )}
 
               {(step === 'datasource' || step === 'breakdown') && (
-                <div className="w-full max-w-[600px] mt-4">
+                <div
+                  className="w-full max-w-[600px]"
+                  style={{
+                    borderRadius: 16,
+                    boxShadow: '0 4px 6px -1px rgba(0,0,0,0.07), 0 2px 4px -2px rgba(0,0,0,0.05)',
+                  }}
+                >
+                  {step === 'datasource' && (
+                    <StepDataSource
+                      onNext={handleDataSourceNext}
+                      onSelectionChange={handleSelectionChange}
+                    />
+                  )}
+                  {step === 'breakdown' && (
+                    <StepBreakdown
+                      onSubmit={(id) => { setSelectedBreakdown(id); setStep('building'); }}
+                      onBack={() => setStep('datasource')}
+                      onSelectionChange={setPromptInputValue}
+                    />
+                  )}
                   <PromptInput
                     chips={step === 'datasource' ? DATASOURCE_CHIPS : BREAKDOWN_CHIPS}
                     selectedSources={selectedSources}

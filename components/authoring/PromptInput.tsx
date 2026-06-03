@@ -98,11 +98,11 @@ export default function PromptInput({
   const showChipRow = selectedSources.length > 0 || availableSources.length > 0;
 
   return (
-    <div className="w-full max-w-[600px] mx-auto pb-6">
+    <div className="w-full pb-6">
       {/* Input card */}
       <div
-        className="bg-white rounded-2xl shadow-sm overflow-visible"
-        style={{ border: '1px solid #e2e8f0' }}
+        className="bg-white overflow-visible"
+        style={{ border: '1px solid #e2e8f0', borderTop: 'none', borderTopLeftRadius: 0, borderTopRightRadius: 0, borderBottomLeftRadius: 16, borderBottomRightRadius: 16 }}
       >
         {/* Selected source chips + add button */}
         {showChipRow && (

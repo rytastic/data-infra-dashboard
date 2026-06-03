@@ -142,8 +142,8 @@ export default function Dashboard({ isPreview = false, noSidebar = false, teamId
     [pendingEdits]
   );
 
-  const handleCommand = (cmd: ParsedCommand): PendingEdit | null => {
-    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+  const handleCommand = (cmd: ParsedCommand): PendingEdit[] => {
+    const makeId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
 
     // Snapshot state before the first edit so we can revert all at once
     setPendingEdits(prev => {
@@ -153,7 +153,7 @@ export default function Dashboard({ isPreview = false, noSidebar = false, teamId
       return prev;
     });
 
-    let edit: PendingEdit | null = null;
+    const edits: PendingEdit[] = [];
 
     switch (cmd.type) {
       case 'setMetric': {
@@ -164,44 +164,48 @@ export default function Dashboard({ isPreview = false, noSidebar = false, teamId
           before: miniCompOption(compChartType, season.players, beforeMetric, accentColor),
           after: miniCompOption(compChartType, season.players, afterMetric, accentColor),
         };
-        edit = { id, description: `Changed metric to ${afterMetric.toUpperCase()}`, previewType: 'metric', before: beforeMetric.toUpperCase(), after: afterMetric.toUpperCase(), affectedWidgetIds: ['trend-chart', 'comparison-chart'], previewOptions };
+        edits.push({ id: makeId(), description: `Changed metric to ${afterMetric.toUpperCase()}`, previewType: 'metric', before: beforeMetric.toUpperCase(), after: afterMetric.toUpperCase(), affectedWidgetIds: ['trend-chart', 'comparison-chart'], previewOptions });
         break;
       }
       case 'highlight': {
         const before = highlightedPlayer ?? 'none';
         setHighlightedPlayer(cmd.value ?? null);
         const label = cmd.value === '__top_scorer__' ? 'top scorer' : (cmd.value ?? '');
-        edit = { id, description: `Highlighted ${label}`, previewType: 'highlight', before, after: label, affectedWidgetIds: ['leaderboard', 'player-cards'] };
+        edits.push({ id: makeId(), description: `Highlighted ${label}`, previewType: 'highlight', before, after: label, affectedWidgetIds: ['leaderboard', 'player-cards'] });
         break;
       }
       case 'clearHighlight':
         setHighlightedPlayer(null);
-        edit = { id, description: 'Cleared player highlight', previewType: 'highlight', before: highlightedPlayer ?? 'none', after: 'none', affectedWidgetIds: ['leaderboard', 'player-cards'] };
+        edits.push({ id: makeId(), description: 'Cleared player highlight', previewType: 'highlight', before: highlightedPlayer ?? 'none', after: 'none', affectedWidgetIds: ['leaderboard', 'player-cards'] });
         break;
       case 'setChartType': {
-        const isTrend = cmd.widgetId === 'trend-chart';
-        const before = isTrend ? trendChartType : compChartType;
         const after = cmd.value as 'line' | 'bar';
-        if (isTrend) setTrendChartType(after);
-        else setCompChartType(after as 'bar' | 'line');
-        const chartLabel = isTrend ? 'Scoring Trend' : 'Player Comparison';
-        const previewOptions = isTrend
-          ? { before: miniTrendOption(before as 'line' | 'bar', data.seasons, chartMetric, accentColor), after: miniTrendOption(after, data.seasons, chartMetric, accentColor) }
-          : { before: miniCompOption(before as 'bar' | 'line', season.players, chartMetric, accentColor), after: miniCompOption(after as 'bar' | 'line', season.players, chartMetric, accentColor) };
-        edit = { id, description: `Changed ${chartLabel} to ${after} chart`, previewType: 'chart-type', before, after, affectedWidgetIds: [cmd.widgetId ?? 'trend-chart'], previewOptions };
+        const targetIds = cmd.widgetIds ?? (cmd.widgetId ? [cmd.widgetId] : ['trend-chart']);
+        for (const targetId of targetIds) {
+          const isTrend = targetId === 'trend-chart';
+          const before = isTrend ? trendChartType : compChartType;
+          if (before === after) continue;
+          if (isTrend) setTrendChartType(after);
+          else setCompChartType(after as 'bar' | 'line');
+          const chartLabel = isTrend ? 'Scoring Trend' : 'Player Comparison';
+          const previewOptions = isTrend
+            ? { before: miniTrendOption(before as 'line' | 'bar', data.seasons, chartMetric, accentColor), after: miniTrendOption(after, data.seasons, chartMetric, accentColor) }
+            : { before: miniCompOption(before as 'bar' | 'line', season.players, chartMetric, accentColor), after: miniCompOption(after as 'bar' | 'line', season.players, chartMetric, accentColor) };
+          edits.push({ id: makeId(), description: `Changed ${chartLabel} to ${after} chart`, previewType: 'chart-type', before, after, affectedWidgetIds: [targetId], previewOptions });
+        }
         break;
       }
       case 'setSort': {
         const before = leaderboardSort;
         setLeaderboardSort(cmd.value ?? 'ppg');
-        edit = { id, description: `Sorted leaderboard by ${cmd.value?.toUpperCase()}`, previewType: 'sort', before: before.toUpperCase(), after: (cmd.value ?? '').toUpperCase(), affectedWidgetIds: ['leaderboard'] };
+        edits.push({ id: makeId(), description: `Sorted leaderboard by ${cmd.value?.toUpperCase()}`, previewType: 'sort', before: before.toUpperCase(), after: (cmd.value ?? '').toUpperCase(), affectedWidgetIds: ['leaderboard'] });
         break;
       }
       case 'setLimit': {
         const n = cmd.value ? parseInt(cmd.value) : null;
         const before = leaderboardLimit ? `Top ${leaderboardLimit}` : 'All players';
         setLeaderboardLimit(n);
-        edit = { id, description: n ? `Showing top ${n} players` : 'Showing all players', previewType: 'limit', before, after: n ? `Top ${n}` : 'All players', affectedWidgetIds: ['leaderboard'] };
+        edits.push({ id: makeId(), description: n ? `Showing top ${n} players` : 'Showing all players', previewType: 'limit', before, after: n ? `Top ${n}` : 'All players', affectedWidgetIds: ['leaderboard'] });
         break;
       }
       case 'setAccentColor': {
@@ -212,23 +216,23 @@ export default function Dashboard({ isPreview = false, noSidebar = false, teamId
           before: miniTrendOption(trendChartType, data.seasons, chartMetric, before),
           after: miniTrendOption(trendChartType, data.seasons, chartMetric, after),
         };
-        edit = { id, description: 'Changed chart accent color', previewType: 'color', before, after, affectedWidgetIds: ['trend-chart', 'comparison-chart'], previewOptions };
+        edits.push({ id: makeId(), description: 'Changed chart accent color', previewType: 'color', before, after, affectedWidgetIds: ['trend-chart', 'comparison-chart'], previewOptions });
         break;
       }
       case 'setWidgetTitle': {
         if (cmd.widgetId && cmd.value) {
           const before = widgetTitles[cmd.widgetId] ?? WIDGET_META[cmd.widgetId]?.label ?? cmd.widgetId;
           setWidgetTitles(prev => ({ ...prev, [cmd.widgetId!]: cmd.value! }));
-          edit = { id, description: `Renamed widget to "${cmd.value}"`, previewType: 'title', before, after: cmd.value, affectedWidgetIds: [cmd.widgetId] };
+          edits.push({ id: makeId(), description: `Renamed widget to "${cmd.value}"`, previewType: 'title', before, after: cmd.value, affectedWidgetIds: [cmd.widgetId] });
         }
         break;
       }
     }
 
-    if (edit) {
-      setPendingEdits(prev => [...prev, edit!]);
+    if (edits.length > 0) {
+      setPendingEdits(prev => [...prev, ...edits]);
     }
-    return edit;
+    return edits;
   };
 
   const handleAcceptEdits = () => {

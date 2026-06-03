@@ -75,8 +75,8 @@ export default function StepDataSource({ onNext, onSelectionChange }: Props) {
   return (
     <div className="w-full max-w-[600px] animate-fade-up">
       <div
-        className="bg-white rounded-2xl shadow-md overflow-hidden"
-        style={{ border: '1px solid var(--md-outline-variant)' }}
+        className="bg-white overflow-hidden"
+        style={{ border: '1px solid var(--md-outline-variant)', borderBottomLeftRadius: 0, borderBottomRightRadius: 0, borderTopLeftRadius: 16, borderTopRightRadius: 16 }}
       >
         {/* Search bar */}
         <div

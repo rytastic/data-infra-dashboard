@@ -151,7 +151,7 @@ export default function StepBreakdown({ onSubmit, onBack, onSelectionChange }: P
 
   return (
     <div className="w-full max-w-[600px] animate-fade-up">
-      <div className="bg-white rounded-2xl shadow-md overflow-hidden" style={{ border: '1px solid var(--md-outline-variant)' }}>
+      <div className="bg-white overflow-hidden" style={{ border: '1px solid var(--md-outline-variant)', borderBottomLeftRadius: 0, borderBottomRightRadius: 0, borderTopLeftRadius: 16, borderTopRightRadius: 16 }}>
         <div className="px-6 pt-5 pb-2">
           <h2 className="text-base font-semibold text-foreground tracking-[0.1px]">Dimension breakdowns</h2>
         </div>

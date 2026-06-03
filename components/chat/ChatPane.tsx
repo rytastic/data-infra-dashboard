@@ -24,6 +24,7 @@ export interface ParsedCommand {
     | 'setWidgetTitle';
   value?: string;
   widgetId?: string;
+  widgetIds?: string[];
 }
 
 export interface WidgetContext {
@@ -34,7 +35,7 @@ export interface WidgetContext {
 }
 
 interface Props {
-  onCommand: (cmd: ParsedCommand) => PendingEdit | null;
+  onCommand: (cmd: ParsedCommand) => PendingEdit[];
   onClose?: () => void;
   chartMetric: ChartMetric;
   highlightedPlayer: string | null;
@@ -78,9 +79,35 @@ const HIGHLIGHT_TRIGGER = /highlight\s+([\w\s]+?)(?:\s+in|\s+on|\s*$)/i;
 const TOP_SCORER_TRIGGER = /highlight.*\btop\s+scor/i;
 const CLEAR_TRIGGER = /clear|remove|reset\s+highlight/i;
 
+function buildChartTypeCommand(
+  chartType: 'line' | 'bar',
+  selectedWidgets: WidgetContext[],
+  primaryWidget: WidgetContext | null,
+): { command: ParsedCommand; response: string } {
+  const chartWidgets = selectedWidgets.filter(w => w.isChart);
+  if (chartWidgets.length > 1) {
+    const widgetIds = chartWidgets.map(w => w.id);
+    const labels = chartWidgets.map(w => w.label);
+    const labelStr = labels.length === 2
+      ? `**${labels[0]}** and **${labels[1]}**`
+      : labels.slice(0, -1).map(l => `**${l}**`).join(', ') + ` and **${labels[labels.length - 1]}**`;
+    return {
+      command: { type: 'setChartType', value: chartType, widgetIds },
+      response: `Switched ${labelStr} to ${chartType} charts.`,
+    };
+  }
+  const widgetId = chartWidgets[0]?.id ?? (primaryWidget?.isChart ? primaryWidget.id : 'trend-chart');
+  const label = chartWidgets[0]?.label ?? primaryWidget?.label ?? 'Chart 1 · Scoring Trend';
+  return {
+    command: { type: 'setChartType', value: chartType, widgetId },
+    response: `Switched **${label}** to a ${chartType} chart.`,
+  };
+}
+
 function parseCommand(
   input: string,
   primaryWidget: WidgetContext | null,
+  selectedWidgets: WidgetContext[],
 ): { command: ParsedCommand; response: string } | null {
   if (CLEAR_TRIGGER.test(input)) {
     return { command: { type: 'clearHighlight' }, response: 'Cleared! The player highlight has been removed.' };
@@ -101,14 +128,10 @@ function parseCommand(
   }
 
   if (/\bbar\b.*chart|\bbar\b.*graph|switch.*\bbar\b|change.*\bbar\b|as bars?\b|to bar\b/i.test(input)) {
-    const widgetId = primaryWidget?.isChart ? primaryWidget.id : 'trend-chart';
-    const label = primaryWidget?.isChart ? primaryWidget.label : 'Chart 1 · Scoring Trend';
-    return { command: { type: 'setChartType', value: 'bar', widgetId }, response: `Switched **${label}** to a bar chart.` };
+    return buildChartTypeCommand('bar', selectedWidgets, primaryWidget);
   }
   if (/\bline\b.*chart|\bline\b.*graph|switch.*\bline\b|change.*\bline\b|as lines?\b|to line\b/i.test(input)) {
-    const widgetId = primaryWidget?.isChart ? primaryWidget.id : 'trend-chart';
-    const label = primaryWidget?.isChart ? primaryWidget.label : 'Chart 1 · Scoring Trend';
-    return { command: { type: 'setChartType', value: 'line', widgetId }, response: `Switched **${label}** to a line chart.` };
+    return buildChartTypeCommand('line', selectedWidgets, primaryWidget);
   }
 
   for (const { patterns, key, label } of SORT_TRIGGERS) {
@@ -235,7 +258,7 @@ export default function ChatPane({
     await new Promise(r => setTimeout(r, 500 + Math.random() * 400));
     setIsTyping(false);
 
-    const result = parseCommand(text, primaryWidget);
+    const result = parseCommand(text, primaryWidget, selectedWidgets);
     if (result) onCommand(result.command);
     const responseText = result
       ? result.response
