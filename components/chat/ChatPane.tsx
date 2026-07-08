@@ -44,6 +44,8 @@ interface Props {
   pendingEdits: PendingEdit[];
   onAcceptEdits: () => void;
   onDiscardEdits: () => void;
+  emptyHeading?: string;
+  emptySuggestions?: string[];
 }
 
 // ─── command parsing ──────────────────────────────────────────────────────────
@@ -201,6 +203,8 @@ export default function ChatPane({
   pendingEdits,
   onAcceptEdits,
   onDiscardEdits,
+  emptyHeading,
+  emptySuggestions,
 }: Props) {
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -305,10 +309,10 @@ export default function ChatPane({
       {isEmptyState ? (
         <div className="flex-1 flex flex-col items-center justify-center px-6 pb-4 min-h-0">
           <h2 className="text-2xl font-semibold text-slate-800 text-center mb-5">
-            Jump into the data…
+            {emptyHeading ?? 'Jump into the data…'}
           </h2>
           <div className="w-full space-y-2.5">
-            {EMPTY_SUGGESTIONS.map(s => (
+            {(emptySuggestions ?? EMPTY_SUGGESTIONS).map(s => (
               <button
                 key={s}
                 onClick={() => sendMessage(s)}

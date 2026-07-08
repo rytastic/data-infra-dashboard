@@ -68,9 +68,21 @@ interface Props {
   teamId?: string;
   sectionTitle?: string;
   layout?: DashboardLayout;
+  title?: string;
+  startWithCloneSuggestion?: boolean;
+  onCloneDashboard?: () => void;
 }
 
-export default function Dashboard({ isPreview = false, noSidebar = false, teamId, sectionTitle, layout = 'overview' }: Props) {
+export default function Dashboard({
+  isPreview = false,
+  noSidebar = false,
+  teamId,
+  sectionTitle,
+  layout = 'overview',
+  title,
+  startWithCloneSuggestion = false,
+  onCloneDashboard,
+}: Props) {
   const data = (teamId && TEAMS[teamId]) ? TEAMS[teamId] : fallbackData;
   const [selectedYear, setSelectedYear] = useState(data.seasons[data.seasons.length - 1].year);
   const [chartMetric, setChartMetric] = useState<ChartMetric>('ppg');
@@ -316,20 +328,32 @@ export default function Dashboard({ isPreview = false, noSidebar = false, teamId
                   {sectionTitle}
                 </p>
               )}
-              <h1 className="text-slate-900 font-bold text-xl leading-tight">{data.team}</h1>
+              <h1 className="text-slate-900 font-bold text-xl leading-tight">{title ?? data.team}</h1>
             </div>
           </div>
 
-          {/* Reopen button — only when pane is closed */}
-          {!isPreview && !chatOpen && (
-            <button
-              onClick={() => setChatOpen(true)}
-              className="flex items-center gap-2 px-3 py-2 rounded-full bg-slate-900 hover:bg-slate-700 text-white text-xs font-medium transition-colors shadow-sm"
-            >
-              <StarIcon className="w-3.5 h-3.5" />
-              Data assistant
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            {!isPreview && onCloneDashboard && (
+              <button
+                onClick={onCloneDashboard}
+                className="flex items-center gap-2 px-4 py-2 rounded-full border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-sm font-medium transition-colors shadow-sm"
+              >
+                <PlusIcon className="w-4 h-4" />
+                Clone dashboard
+              </button>
+            )}
+
+            {/* Reopen button — only when pane is closed */}
+            {!isPreview && !chatOpen && (
+              <button
+                onClick={() => setChatOpen(true)}
+                className="flex items-center gap-2 px-3 py-2 rounded-full bg-slate-900 hover:bg-slate-700 text-white text-xs font-medium transition-colors shadow-sm"
+              >
+                <StarIcon className="w-3.5 h-3.5" />
+                Data assistant
+              </button>
+            )}
+          </div>
         </header>
 
         {/* Deselect on background click */}
@@ -415,6 +439,8 @@ export default function Dashboard({ isPreview = false, noSidebar = false, teamId
             pendingEdits={pendingEdits}
             onAcceptEdits={handleAcceptEdits}
             onDiscardEdits={handleDiscardEdits}
+            emptyHeading={startWithCloneSuggestion ? 'Ready to update' : undefined}
+            emptySuggestions={startWithCloneSuggestion ? ['Update with current half data'] : undefined}
           />
         </div>
       )}
@@ -466,6 +492,14 @@ function StarIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 16 16" fill="currentColor">
       <path d="M8 0.5L9.8 6.2L15.5 8L9.8 9.8L8 15.5L6.2 9.8L0.5 8L6.2 6.2L8 0.5Z" />
+    </svg>
+  );
+}
+
+function PlusIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
     </svg>
   );
 }

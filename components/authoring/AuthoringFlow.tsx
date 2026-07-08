@@ -206,6 +206,10 @@ export default function AuthoringFlow() {
   const [navTeamOverrides, setNavTeamOverrides] = useState<Record<string, string>>({});
   // maps created nav item IDs to dashboard layout
   const [navLayoutOverrides, setNavLayoutOverrides] = useState<Record<string, DashboardLayout>>({});
+  // maps nav item IDs to a custom display title (used by cloned dashboards)
+  const [navTitleOverrides, setNavTitleOverrides] = useState<Record<string, string>>({});
+  // marks nav item IDs that should open the chat pane with the "clone" welcome state
+  const [navCloneWelcome, setNavCloneWelcome] = useState<Record<string, boolean>>({});
   const [selectedBreakdown, setSelectedBreakdown] = useState<string>('b3');
 
   const handleNewDash = () => {
@@ -289,6 +293,32 @@ export default function AuthoringFlow() {
     setStep('dashboard');
   };
 
+  const handleCloneDashboard = () => {
+    const teamId = navTeamOverrides[activeNavId] ?? activeNavId;
+    const currentTitle =
+      navTitleOverrides[activeNavId] ??
+      TEAMS[teamId]?.team ??
+      sections.flatMap(s => s.items).find(i => i.id === activeNavId)?.label ??
+      'Dashboard';
+    const cloneTitle = `Copy of ${currentTitle}`;
+    const navId = `clone-${activeNavId}-${Date.now()}`;
+
+    setSections(prev => {
+      const withoutCreated = prev.filter(s => s.id !== 'created');
+      const existingCreated = prev.find(s => s.id === 'created');
+      const createdItems = existingCreated
+        ? [...existingCreated.items, { id: navId, label: cloneTitle }]
+        : [{ id: navId, label: cloneTitle }];
+      return [{ id: 'created', label: 'My Dashboards', items: createdItems }, ...withoutCreated];
+    });
+
+    setNavTeamOverrides(prev => ({ ...prev, [navId]: teamId }));
+    setNavLayoutOverrides(prev => ({ ...prev, [navId]: navLayoutOverrides[activeNavId] ?? 'overview' }));
+    setNavTitleOverrides(prev => ({ ...prev, [navId]: cloneTitle }));
+    setNavCloneWelcome(prev => ({ ...prev, [navId]: true }));
+    setActiveNavId(navId);
+  };
+
   return (
     <div className="flex h-screen overflow-hidden">
       <AppSidebar
@@ -306,10 +336,14 @@ export default function AuthoringFlow() {
       >
         {step === 'dashboard' && (
           <Dashboard
+            key={activeNavId}
             noSidebar
             teamId={navTeamOverrides[activeNavId] ?? activeNavId}
             layout={navLayoutOverrides[activeNavId] ?? 'overview'}
             sectionTitle={sections.find(s => s.items.some(i => i.id === activeNavId))?.label}
+            title={navTitleOverrides[activeNavId]}
+            startWithCloneSuggestion={!!navCloneWelcome[activeNavId]}
+            onCloneDashboard={handleCloneDashboard}
           />
         )}
 
