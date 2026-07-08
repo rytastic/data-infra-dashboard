@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import AppSidebar, { type NavSection } from '@/components/shared/AppSidebar';
 import StepDataSource from './StepDataSource';
 import StepBreakdown from './StepBreakdown';
@@ -26,7 +26,7 @@ const SOURCE_TO_TEAM: Record<string, string> = {
   's13': 'arizona',
 };
 
-interface SelectedSource { id: string; label: string }
+interface SelectedSource { id: string; label: string; kind?: 'source' | 'dashboard' }
 
 const BASE_SECTIONS: NavSection[] = [
   {
@@ -241,10 +241,6 @@ export default function AuthoringFlow() {
     setSidebarCollapsed(prev => !prev);
   };
 
-  const handleSelectionChange = useCallback((sources: SelectedSource[]) => {
-    setSelectedSources(sources);
-  }, []);
-
   const handleRemoveSource = (id: string) => {
     setSelectedSources(prev => prev.filter(s => s.id !== id));
   };
@@ -255,9 +251,19 @@ export default function AuthoringFlow() {
     );
   };
 
+  const handleToggleSource = (source: SelectedSource) => {
+    if (selectedSources.some(s => s.id === source.id)) handleRemoveSource(source.id);
+    else handleAddSource(source);
+  };
+
   const availableSources = ALL_SOURCES.filter(
     s => !selectedSources.some(sel => sel.id === s.id)
   );
+
+  const availableDashboards = sections
+    .flatMap(s => s.items)
+    .filter(i => !i.isPlaceholder && !selectedSources.some(sel => sel.id === i.id))
+    .map(i => ({ id: i.id, label: i.label }));
 
   const datasourceHasPrompt = !!datasourcePromptValue.trim();
 
@@ -393,7 +399,8 @@ export default function AuthoringFlow() {
                   >
                     {step === 'datasource' && (
                       <StepDataSource
-                        onSelectionChange={handleSelectionChange}
+                        selectedIds={selectedSources.map(s => s.id)}
+                        onToggle={handleToggleSource}
                       />
                     )}
                     {step === 'breakdown' && (
@@ -409,6 +416,7 @@ export default function AuthoringFlow() {
                       <PromptInput
                         selectedSources={selectedSources}
                         availableSources={availableSources}
+                        availableDashboards={availableDashboards}
                         onRemoveSource={handleRemoveSource}
                         onAddSource={handleAddSource}
                         placeholder="Select data source(s) or ask a data question"
@@ -426,6 +434,7 @@ export default function AuthoringFlow() {
                       <PromptInput
                         selectedSources={selectedSources}
                         availableSources={availableSources}
+                        availableDashboards={availableDashboards}
                         onRemoveSource={handleRemoveSource}
                         onAddSource={handleAddSource}
                         placeholder="Select data source(s) or ask a data question"

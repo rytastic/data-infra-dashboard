@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useRef } from 'react';
 
 const ALL_SOURCES = [
   { id: 's1',  title: 'Cyclone basketball 2020-21',         subtitle: 'Men + Women full season with roster',       chipLabel: 'Cyclone basketball 2020-21',            defaultChecked: false },
@@ -38,30 +38,18 @@ const ALL_SOURCES = [
 interface SelectedSource { id: string; label: string }
 
 interface Props {
-  onSelectionChange?: (selected: SelectedSource[]) => void;
+  selectedIds?: string[];
+  onToggle?: (source: SelectedSource) => void;
 }
 
-export default function StepDataSource({ onSelectionChange }: Props) {
-  const [selected, setSelected] = useState<Set<string>>(
-    new Set(ALL_SOURCES.filter(s => s.defaultChecked).map(s => s.id))
-  );
+export default function StepDataSource({ selectedIds = [], onToggle }: Props) {
+  const selected = new Set(selectedIds);
   const [showChip, setShowChip] = useState(true);
   const [query, setQuery] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    const items = ALL_SOURCES
-      .filter(s => selected.has(s.id))
-      .map(s => ({ id: s.id, label: s.chipLabel }));
-    onSelectionChange?.(items);
-  }, [selected, onSelectionChange]);
-
-  const toggle = (id: string) => {
-    setSelected(prev => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
+  const toggle = (source: (typeof ALL_SOURCES)[number]) => {
+    onToggle?.({ id: source.id, label: source.chipLabel });
   };
 
   const visibleSources = query.trim()
@@ -137,7 +125,7 @@ export default function StepDataSource({ onSelectionChange }: Props) {
                 return (
                   <li key={source.id}>
                     <button
-                      onClick={() => toggle(source.id)}
+                      onClick={() => toggle(source)}
                       className="w-full flex items-center justify-between px-6 py-3.5 hover:bg-[#EFF1F7] transition-colors text-left"
                     >
                       <div className="min-w-0 pr-4">

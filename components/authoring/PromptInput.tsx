@@ -5,11 +5,13 @@ import { useState, useRef, useEffect } from 'react';
 interface SourceChip {
   id: string;
   label: string;
+  kind?: 'source' | 'dashboard';
 }
 
 interface Props {
   selectedSources?: SourceChip[];
   availableSources?: SourceChip[];
+  availableDashboards?: SourceChip[];
   onRemoveSource?: (id: string) => void;
   onAddSource?: (source: SourceChip) => void;
   placeholder?: string;
@@ -21,8 +23,30 @@ interface Props {
 }
 
 const MAX_VISIBLE_SOURCE_CHIPS = 3;
+const MAX_MENTION_RESULTS = 5;
 
-function SourceChip({ label, onRemove }: { label: string; onRemove?: () => void }) {
+function SourceGlyph({ className = 'w-3 h-3' }: { className?: string }) {
+  return (
+    <svg className={`${className} text-slate-400 flex-shrink-0`} viewBox="0 0 16 16" fill="currentColor">
+      <rect x="1" y="8" width="3" height="7" rx="0.5"/>
+      <rect x="6" y="5" width="3" height="10" rx="0.5"/>
+      <rect x="11" y="2" width="3" height="13" rx="0.5"/>
+    </svg>
+  );
+}
+
+function DashboardGlyph({ className = 'w-3 h-3' }: { className?: string }) {
+  return (
+    <svg className={`${className} text-slate-400 flex-shrink-0`} viewBox="0 0 16 16" fill="currentColor">
+      <rect x="1" y="1" width="6" height="6" rx="1"/>
+      <rect x="9" y="1" width="6" height="6" rx="1"/>
+      <rect x="1" y="9" width="6" height="6" rx="1"/>
+      <rect x="9" y="9" width="6" height="6" rx="1"/>
+    </svg>
+  );
+}
+
+function SourceChip({ label, kind, onRemove }: { label: string; kind?: 'source' | 'dashboard'; onRemove?: () => void }) {
   return (
     <span
       className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600"
@@ -33,11 +57,7 @@ function SourceChip({ label, onRemove }: { label: string; onRemove?: () => void 
         background: '#f8fafc',
       }}
     >
-      <svg className="w-3 h-3 text-slate-400 flex-shrink-0" viewBox="0 0 16 16" fill="currentColor">
-        <rect x="1" y="8" width="3" height="7" rx="0.5"/>
-        <rect x="6" y="5" width="3" height="10" rx="0.5"/>
-        <rect x="11" y="2" width="3" height="13" rx="0.5"/>
-      </svg>
+      {kind === 'dashboard' ? <DashboardGlyph /> : <SourceGlyph />}
       {label}
       {onRemove && (
         <button
@@ -105,6 +125,7 @@ function SourceOverflowPopover({
           <SourceChip
             key={source.id}
             label={source.label}
+            kind={source.kind}
             onRemove={onRemove ? () => onRemove(source.id) : undefined}
           />
         ))}
@@ -147,11 +168,7 @@ function AddSourceDropdown({
           className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-left transition-colors hover:bg-[#EFF1F7]"
           style={{ color: '#374151' }}
         >
-          <svg className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" viewBox="0 0 16 16" fill="currentColor">
-            <rect x="1" y="8" width="3" height="7" rx="0.5"/>
-            <rect x="6" y="5" width="3" height="10" rx="0.5"/>
-            <rect x="11" y="2" width="3" height="13" rx="0.5"/>
-          </svg>
+          <SourceGlyph className="w-3.5 h-3.5" />
           {s.label}
         </button>
       ))}
@@ -159,9 +176,116 @@ function AddSourceDropdown({
   );
 }
 
+interface MentionItem {
+  id: string;
+  label: string;
+  kind: 'source' | 'dashboard';
+}
+
+function getActiveMention(text: string, cursorPos: number): { start: number; query: string } | null {
+  const uptoCursor = text.slice(0, cursorPos);
+  const atIndex = uptoCursor.lastIndexOf('@');
+  if (atIndex === -1) return null;
+  const charBefore = atIndex > 0 ? uptoCursor[atIndex - 1] : '';
+  if (charBefore && !/\s/.test(charBefore)) return null;
+  const query = uptoCursor.slice(atIndex + 1);
+  if (/\s/.test(query)) return null;
+  return { start: atIndex, query };
+}
+
+function MentionRow({
+  item,
+  active,
+  onSelect,
+}: {
+  item: MentionItem;
+  active: boolean;
+  onSelect: (item: MentionItem) => void;
+}) {
+  return (
+    <button
+      onMouseDown={(e) => { e.preventDefault(); onSelect(item); }}
+      className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-left transition-colors"
+      style={{ color: '#374151', background: active ? '#EFF1F7' : 'transparent' }}
+    >
+      {item.kind === 'dashboard' ? <DashboardGlyph className="w-3.5 h-3.5" /> : <SourceGlyph className="w-3.5 h-3.5" />}
+      {item.label}
+    </button>
+  );
+}
+
+function MentionDropdown({
+  sourceItems,
+  dashboardItems,
+  activeIndex,
+  onSelect,
+  onClose,
+  anchor,
+  excludeRef,
+}: {
+  sourceItems: MentionItem[];
+  dashboardItems: MentionItem[];
+  activeIndex: number;
+  onSelect: (item: MentionItem) => void;
+  onClose: () => void;
+  anchor: { top: number; left: number; width: number };
+  excludeRef: React.RefObject<HTMLElement | null>;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const combined = [...sourceItems, ...dashboardItems];
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (ref.current?.contains(target)) return;
+      if (excludeRef.current?.contains(target)) return;
+      onClose();
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [onClose, excludeRef]);
+
+  return (
+    <div
+      ref={ref}
+      data-testid="mention-dropdown"
+      className="fixed z-[9999] bg-white rounded-xl shadow-lg overflow-hidden"
+      style={{ top: anchor.top, left: anchor.left, width: anchor.width, maxHeight: 320, border: '1px solid #e2e8f0' }}
+    >
+      {combined.length === 0 ? (
+        <p className="px-4 py-3 text-sm text-slate-400">No matches</p>
+      ) : (
+        <div style={{ maxHeight: 320, overflowY: 'auto' }}>
+          {sourceItems.length > 0 && (
+            <div>
+              <p className="px-4 pt-2.5 pb-1 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">
+                Data sources
+              </p>
+              {sourceItems.map((item) => (
+                <MentionRow key={`s-${item.id}`} item={item} active={combined.indexOf(item) === activeIndex} onSelect={onSelect} />
+              ))}
+            </div>
+          )}
+          {dashboardItems.length > 0 && (
+            <div>
+              <p className="px-4 pt-2.5 pb-1 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">
+                Dashboards
+              </p>
+              {dashboardItems.map((item) => (
+                <MentionRow key={`d-${item.id}`} item={item} active={combined.indexOf(item) === activeIndex} onSelect={onSelect} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function PromptInput({
   selectedSources = [],
   availableSources = [],
+  availableDashboards = [],
   onRemoveSource,
   onAddSource,
   placeholder = 'What data question can I answer?',
@@ -176,6 +300,11 @@ export default function PromptInput({
   const [sourceOverflowOpen, setSourceOverflowOpen] = useState(false);
   const [overflowAnchor, setOverflowAnchor] = useState<{ top: number; left: number } | null>(null);
   const overflowBtnRef = useRef<HTMLButtonElement>(null);
+  const [mention, setMention] = useState<{ start: number; query: string } | null>(null);
+  const [mentionAnchor, setMentionAnchor] = useState<{ top: number; left: number; width: number } | null>(null);
+  const [mentionActiveIndex, setMentionActiveIndex] = useState(0);
+  const inputRowRef = useRef<HTMLDivElement>(null);
+  const textInputRef = useRef<HTMLInputElement>(null);
 
   // Sync externally controlled value
   useEffect(() => {
@@ -198,7 +327,74 @@ export default function PromptInput({
     if (isCtaEnabled) onSubmit?.(value.trim());
   };
 
-  const handleKey = (e: React.KeyboardEvent) => {
+  const updateMentionFromCursor = (text: string, cursorPos: number) => {
+    const m = getActiveMention(text, cursorPos);
+    setMention(m);
+    setMentionActiveIndex(0);
+    if (m) {
+      setDropdownOpen(false);
+      setSourceOverflowOpen(false);
+      if (inputRowRef.current) {
+        const rect = inputRowRef.current.getBoundingClientRect();
+        setMentionAnchor({ top: rect.bottom + 6, left: rect.left, width: rect.width });
+      }
+    }
+  };
+
+  const mentionQuery = mention?.query.toLowerCase() ?? '';
+  const filteredSourceMentions: MentionItem[] = mention
+    ? availableSources
+        .filter(s => s.label.toLowerCase().includes(mentionQuery))
+        .slice(0, MAX_MENTION_RESULTS)
+        .map(s => ({ id: s.id, label: s.label, kind: 'source' as const }))
+    : [];
+  const filteredDashboardMentions: MentionItem[] = mention
+    ? availableDashboards
+        .filter(d => d.label.toLowerCase().includes(mentionQuery))
+        .slice(0, MAX_MENTION_RESULTS)
+        .map(d => ({ id: d.id, label: d.label, kind: 'dashboard' as const }))
+    : [];
+  const mentionItems = [...filteredSourceMentions, ...filteredDashboardMentions];
+
+  const selectMention = (item: MentionItem) => {
+    if (!mention) return;
+    const spanEnd = mention.start + 1 + mention.query.length;
+    const before = value.slice(0, mention.start);
+    const after = value.slice(spanEnd);
+    const nextValue = `${before}${after}`.replace(/[ \t]{2,}/g, ' ');
+    handleChange(nextValue);
+    setMention(null);
+    onAddSource?.({ id: item.id, label: item.label, kind: item.kind });
+    requestAnimationFrame(() => {
+      textInputRef.current?.focus();
+      textInputRef.current?.setSelectionRange(before.length, before.length);
+    });
+  };
+
+  const handleKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (mention) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setMentionActiveIndex(i => Math.min(i + 1, Math.max(mentionItems.length - 1, 0)));
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setMentionActiveIndex(i => Math.max(i - 1, 0));
+        return;
+      }
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const item = mentionItems[mentionActiveIndex];
+        if (item) selectMention(item);
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setMention(null);
+        return;
+      }
+    }
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSubmit();
@@ -224,6 +420,7 @@ export default function PromptInput({
                 <SourceChip
                   key={source.id}
                   label={source.label}
+                  kind={source.kind}
                   onRemove={onRemoveSource ? () => onRemoveSource(source.id) : undefined}
                 />
               ))}
@@ -300,14 +497,36 @@ export default function PromptInput({
         )}
 
         {/* Text input row */}
-        <div className="flex items-center gap-2 px-4 py-3">
+        <div ref={inputRowRef} className="flex items-center gap-2 px-4 py-3 relative">
           <input
+            ref={textInputRef}
             value={value}
-            onChange={(e) => handleChange(e.target.value)}
+            onChange={(e) => {
+              handleChange(e.target.value);
+              updateMentionFromCursor(e.target.value, e.target.selectionStart ?? e.target.value.length);
+            }}
+            onClick={(e) => updateMentionFromCursor(value, e.currentTarget.selectionStart ?? value.length)}
+            onKeyUp={(e) => {
+              if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) {
+                updateMentionFromCursor(value, e.currentTarget.selectionStart ?? value.length);
+              }
+            }}
             onKeyDown={handleKey}
             placeholder={placeholder}
             className="flex-1 bg-transparent text-sm text-slate-700 placeholder:text-slate-400 outline-none"
           />
+
+          {mention && mentionAnchor && (
+            <MentionDropdown
+              sourceItems={filteredSourceMentions}
+              dashboardItems={filteredDashboardMentions}
+              activeIndex={mentionActiveIndex}
+              onSelect={selectMention}
+              onClose={() => setMention(null)}
+              anchor={mentionAnchor}
+              excludeRef={textInputRef}
+            />
+          )}
           {ctaLabel ? (
             <button
               onClick={handleSubmit}
