@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import AppSidebar, { type NavSection } from '@/components/shared/AppSidebar';
 import StepDataSource from './StepDataSource';
 import StepBreakdown from './StepBreakdown';
@@ -241,9 +241,9 @@ export default function AuthoringFlow() {
     setSidebarCollapsed(prev => !prev);
   };
 
-  const handleSelectionChange = (sources: SelectedSource[]) => {
+  const handleSelectionChange = useCallback((sources: SelectedSource[]) => {
     setSelectedSources(sources);
-  };
+  }, []);
 
   const handleRemoveSource = (id: string) => {
     setSelectedSources(prev => prev.filter(s => s.id !== id));
