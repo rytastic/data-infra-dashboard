@@ -383,8 +383,12 @@ export default function AuthoringFlow() {
                   <ChipCarousel
                     chips={step === 'datasource' ? DATASOURCE_CHIPS : BREAKDOWN_CHIPS}
                     onSelect={(chip) => {
-                      if (step === 'datasource') setDatasourcePromptValue(chip);
-                      if (step === 'breakdown') setPromptInputValue(chip);
+                      if (step === 'datasource') {
+                        setDatasourcePromptValue((prev) => (prev.trim() ? `${prev.trim()} ${chip}` : chip));
+                      }
+                      if (step === 'breakdown') {
+                        setPromptInputValue((prev) => (prev.trim() ? `${prev.trim()} ${chip}` : chip));
+                      }
                     }}
                   />
                 </>
