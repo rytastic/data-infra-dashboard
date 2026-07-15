@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
+import { Layout, LayoutContent, LayoutPanel } from '@astryxdesign/core/Layout';
 import cyclonesData from '@/data/cyclones.json';
 import TEAMS from '@/data/teams';
 import StatsBar from './StatsBar';
@@ -270,52 +271,12 @@ export default function Dashboard({
   };
 
   return (
-    <div className="flex h-screen bg-slate-50 font-sans overflow-hidden">
-      {/* Left sidebar */}
-      {!noSidebar && (
-        <aside className="w-56 flex-shrink-0 bg-slate-900 flex flex-col border-r border-slate-800">
-          <div className="px-5 py-5 border-b border-slate-800">
-            <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-lg bg-[#3b82f6] flex items-center justify-center flex-shrink-0">
-                <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                </svg>
-              </div>
-              <div>
-                <p className="text-slate-100 text-xs font-bold leading-tight">Analytics</p>
-                <p className="text-slate-400 text-[10px]">Dashboard</p>
-              </div>
-            </div>
-          </div>
-
-          <nav className="flex-1 px-3 py-4 space-y-1">
-            {[
-              { label: 'Overview', icon: '📊', active: true },
-              { label: 'Players', icon: '🏀', active: false },
-              { label: 'Schedule', icon: '📅', active: false },
-              { label: 'Recruiting', icon: '🎯', active: false },
-              { label: 'Analytics', icon: '🔬', active: false },
-            ].map(item => (
-              <div
-                key={item.label}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm cursor-pointer transition-all duration-150 ${
-                  item.active
-                    ? 'bg-[#3b82f6]/15 text-[#3b82f6]'
-                    : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800'
-                }`}
-              >
-                <span className="text-base">{item.icon}</span>
-                <span className="font-medium">{item.label}</span>
-                {item.active && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-[#3b82f6]" />}
-              </div>
-            ))}
-          </nav>
-        </aside>
-      )}
-
-      {/* Main scrollable content */}
-      <main className="flex-1 overflow-y-auto min-w-0">
-        <header className="bg-white border-b border-slate-200 px-8 py-4 flex items-center justify-between sticky top-0 z-20">
+    <Layout
+      height="fill"
+      content={
+        <LayoutContent padding={0}>
+          <div className="bg-slate-50 font-sans min-w-0">
+            <header className="bg-white border-b border-slate-200 px-8 py-4 flex items-center justify-between sticky top-0 z-20">
           <div className="flex items-center gap-4">
             <div className="w-10 h-10 rounded-full bg-[#3b82f6] flex items-center justify-center shadow-sm flex-shrink-0">
               <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -424,27 +385,29 @@ export default function Dashboard({
 
           <div className="h-4" />
         </div>
-      </main>
-
-      {/* Right chat pane */}
-      {!isPreview && chatOpen && (
-        <div className="w-96 flex-shrink-0 border-l border-slate-200 flex flex-col h-full">
-          <ChatPane
-            onCommand={handleCommand}
-            onClose={() => setChatOpen(false)}
-            chartMetric={chartMetric}
-            highlightedPlayer={resolvedHighlight}
-            selectedWidgets={widgetContexts}
-            onClearWidget={(id) => setSelectedWidgets(prev => prev.filter(w => w !== id))}
-            pendingEdits={pendingEdits}
-            onAcceptEdits={handleAcceptEdits}
-            onDiscardEdits={handleDiscardEdits}
-            emptyHeading={startWithCloneSuggestion ? 'Ready to update' : undefined}
-            emptySuggestions={startWithCloneSuggestion ? ['Update with current half data'] : undefined}
-          />
-        </div>
-      )}
-    </div>
+          </div>
+        </LayoutContent>
+      }
+      end={
+        !isPreview && chatOpen ? (
+          <LayoutPanel width={384} hasDivider padding={0} isScrollable={false}>
+            <ChatPane
+              onCommand={handleCommand}
+              onClose={() => setChatOpen(false)}
+              chartMetric={chartMetric}
+              highlightedPlayer={resolvedHighlight}
+              selectedWidgets={widgetContexts}
+              onClearWidget={(id) => setSelectedWidgets(prev => prev.filter(w => w !== id))}
+              pendingEdits={pendingEdits}
+              onAcceptEdits={handleAcceptEdits}
+              onDiscardEdits={handleDiscardEdits}
+              emptyHeading={startWithCloneSuggestion ? 'Ready to update' : undefined}
+              emptySuggestions={startWithCloneSuggestion ? ['Update with current half data'] : undefined}
+            />
+          </LayoutPanel>
+        ) : undefined
+      }
+    />
   );
 }
 
