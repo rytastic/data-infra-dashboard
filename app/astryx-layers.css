@@ -1,0 +1,13 @@
+/* Explicit cascade layer order for Astryx + Tailwind coexistence.
+   Imported first from globals.css — Next.js/webpack hoists @import statements
+   above inline CSS, so this order has to be established in its own file rather
+   than inlined after Tailwind's own imports. Later-listed layers win conflicts. */
+@layer reset, theme, base, astryx-base, astryx-theme, components, utilities;
+
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/preflight.css" layer(base);
+@import "@astryxdesign/core/reset.css";
+@import "@astryxdesign/core/astryx.css";
+@import "@astryxdesign/theme-neutral/theme.css";
+@import "@astryxdesign/core/tailwind-theme.css";
+@import "tailwindcss/utilities.css" layer(utilities);

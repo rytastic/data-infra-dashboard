@@ -5,7 +5,11 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "astryx": "node node_modules/@astryxdesign/cli/bin/astryx.mjs"
+  },
+  "astryx": {
+    "theme": "neutral"
   },
   "dependencies": {
     "@astryxdesign/cli": "^0.1.6",
