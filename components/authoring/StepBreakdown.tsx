@@ -172,7 +172,7 @@ export default function StepBreakdown({ onSubmit, onBack, onSelectionChange }: P
                   </div>
                 }
                 endContent={
-                  <span className="text-xs text-[var(--md-on-surface-variant)] whitespace-nowrap">
+                  <span className="text-xs text-slate-500 whitespace-nowrap">
                     {b.widgets} widgets
                   </span>
                 }

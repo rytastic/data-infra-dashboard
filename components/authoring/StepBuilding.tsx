@@ -118,7 +118,7 @@ export default function StepBuilding({ onComplete }: { onComplete: () => void })
         <h2 className="text-2xl font-normal text-foreground mb-2 tracking-[0px]">
           {done ? 'Dashboard Ready!' : 'Building your dashboard...'}
         </h2>
-        <p className="text-sm tracking-[0.25px]" style={{ color: 'var(--md-on-surface-variant)' }}>
+        <p className="text-sm tracking-[0.25px] text-slate-500">
           {done ? 'Everything looks great. Launching preview...' : BUILD_STEPS[currentStep]?.label}
         </p>
       </div>
@@ -142,14 +142,7 @@ export default function StepBuilding({ onComplete }: { onComplete: () => void })
       </div>
 
       {/* Build steps list */}
-      <div
-        style={{
-          background: 'var(--md-surface-container-low)',
-          borderRadius: 'var(--md-shape-large)',
-          boxShadow: 'var(--md-elevation-1)',
-          overflow: 'hidden',
-        }}
-      >
+      <div className="bg-white rounded-lg shadow-sm overflow-hidden">
         {BUILD_STEPS.map((step, i) => {
           const isComplete = i < currentStep || done;
           const isCurrent  = i === currentStep && !done;
@@ -157,44 +150,33 @@ export default function StepBuilding({ onComplete }: { onComplete: () => void })
           return (
             <div
               key={step.label}
-              className="flex items-center gap-3 transition-all duration-300"
-              style={{
-                padding: '12px 16px',
-                borderBottom: i < BUILD_STEPS.length - 1 ? '1px solid var(--md-outline-variant)' : 'none',
-                background: isCurrent ? 'var(--md-primary-container)' : 'transparent',
-              }}
+              className={`flex items-center gap-3 transition-all duration-300 px-4 py-3 ${
+                i < BUILD_STEPS.length - 1 ? 'border-b border-slate-100' : ''
+              } ${isCurrent ? 'bg-accent-muted' : ''}`}
             >
               <div
-                className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-300"
-                style={{
-                  background: isComplete
-                    ? 'oklch(0.88 0.09 152)'
-                    : isCurrent
-                    ? 'var(--md-primary)'
-                    : 'var(--md-surface-variant)',
-                }}
+                className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-300 ${
+                  isComplete ? '' : isCurrent ? 'bg-accent' : 'bg-slate-200'
+                }`}
+                style={isComplete ? { background: 'oklch(0.88 0.09 152)' } : undefined}
               >
                 {isComplete ? (
                   <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20" style={{ color: 'oklch(0.35 0.14 152)' }}>
                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/>
                   </svg>
                 ) : isCurrent ? (
-                  <div className="w-2 h-2 rounded-full animate-pulse" style={{ background: 'var(--md-on-primary)' }}/>
+                  <div className="w-2 h-2 rounded-full animate-pulse bg-white"/>
                 ) : (
-                  <div className="w-2 h-2 rounded-full" style={{ background: 'var(--md-on-surface-variant)', opacity: 0.4 }}/>
+                  <div className="w-2 h-2 rounded-full bg-slate-400 opacity-40"/>
                 )}
               </div>
 
               <span className="text-sm mr-1">{step.icon}</span>
 
               <span
-                className="text-sm transition-colors duration-300 tracking-[0.25px]"
-                style={{
-                  color: isComplete ? 'var(--md-on-surface-variant)' : isCurrent ? 'var(--md-on-primary-container)' : 'var(--md-on-surface-variant)',
-                  opacity: !isComplete && !isCurrent ? 0.5 : 1,
-                  textDecoration: isComplete ? 'line-through' : 'none',
-                  textDecorationColor: 'var(--md-outline)',
-                }}
+                className={`text-sm transition-colors duration-300 tracking-[0.25px] ${
+                  isComplete ? 'text-slate-500 line-through' : isCurrent ? 'text-accent' : 'text-slate-500 opacity-50'
+                }`}
               >
                 {step.label}
               </span>

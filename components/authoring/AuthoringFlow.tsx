@@ -298,7 +298,7 @@ export default function AuthoringFlow() {
                 <h1 className="text-[22px] font-bold text-foreground tracking-[-0.25px]">
                   Let&apos;s create a dashboard page
                 </h1>
-                <p className="text-sm text-[var(--md-on-surface-variant)] mt-1">
+                <p className="text-sm text-slate-500 mt-1">
                   Select a data source or ask a data question
                 </p>
               </div>
@@ -325,9 +325,8 @@ export default function AuthoringFlow() {
                 <>
                   {/* Tray: step card + prompt input joined under one border */}
                   <div
-                    className="w-full max-w-[600px] overflow-hidden"
+                    className="w-full max-w-[600px] overflow-hidden border border-slate-200"
                     style={{
-                      border: '1px solid var(--md-outline-variant)',
                       borderRadius: 16,
                       boxShadow: '0 4px 6px -1px rgba(0,0,0,0.07), 0 2px 4px -2px rgba(0,0,0,0.05)',
                     }}
