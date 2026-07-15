@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { RadioList, RadioListItem } from '@astryxdesign/core/RadioList';
 
 const BREAKDOWNS = [
   {
@@ -156,47 +157,29 @@ export default function StepBreakdown({ onSubmit, onBack, onSelectionChange }: P
           <h2 className="text-base font-semibold text-foreground tracking-[0.1px]">Dimension breakdowns</h2>
         </div>
 
-        <ul className="divide-y divide-[var(--md-outline-variant)]">
+        <RadioList label="Dimension breakdowns" isLabelHidden value={selected} onChange={setSelected}>
           {BREAKDOWNS.map((b) => {
-            const isSelected = selected === b.id;
             const Thumb = THUMBNAIL_MAP[b.thumbnail];
             return (
-              <li key={b.id}>
-                <button
-                  onClick={() => setSelected(b.id)}
-                  className="w-full flex items-center gap-4 px-6 py-4 hover:bg-[#EFF1F7] transition-colors text-left"
-                >
-                  {/* Preview thumbnail */}
-                  <div
-                    className="flex-shrink-0 rounded-xl overflow-hidden"
-                    style={{ width: 88, height: 62 }}
-                  >
+              <RadioListItem
+                key={b.id}
+                value={b.id}
+                label={b.title}
+                description={b.subtitle}
+                startContent={
+                  <div className="flex-shrink-0 rounded-xl overflow-hidden" style={{ width: 88, height: 62 }}>
                     <Thumb />
                   </div>
-
-                  {/* Text */}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground">{b.title}</p>
-                    <p className="text-xs text-[var(--md-on-surface-variant)] mt-0.5">{b.subtitle}</p>
-                  </div>
-
-                  {/* Widget count + radio */}
-                  <div className="flex items-center gap-3 flex-shrink-0">
-                    <span className="text-xs text-[var(--md-on-surface-variant)]">{b.widgets} widgets</span>
-                    <div
-                      className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 transition-colors"
-                      style={{ border: isSelected ? '2px solid var(--md-primary)' : '2px solid #94a3b8' }}
-                    >
-                      {isSelected && (
-                        <div className="w-2.5 h-2.5 rounded-full" style={{ background: 'var(--md-primary)' }} />
-                      )}
-                    </div>
-                  </div>
-                </button>
-              </li>
+                }
+                endContent={
+                  <span className="text-xs text-[var(--md-on-surface-variant)] whitespace-nowrap">
+                    {b.widgets} widgets
+                  </span>
+                }
+              />
             );
           })}
-        </ul>
+        </RadioList>
 
         <div className="px-6 py-2.5" style={{ borderTop: '1px solid #f1f5f9' }}>
           <button
