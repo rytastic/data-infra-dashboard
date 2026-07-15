@@ -1,7 +1,7 @@
 import type { Preview } from '@storybook/nextjs-vite';
 import React from 'react';
 import { Theme } from '@astryxdesign/core/theme';
-import { neutralTheme } from '@astryxdesign/theme-neutral/built';
+import { appTheme } from '../app/theme';
 import '../app/globals.css';
 
 const preview: Preview = {
@@ -22,7 +22,7 @@ const preview: Preview = {
   },
   decorators: [
     (Story) => (
-      <Theme theme={neutralTheme}>
+      <Theme theme={appTheme}>
         <Story />
       </Theme>
     ),

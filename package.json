@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "astryx": "node node_modules/@astryxdesign/cli/bin/astryx.mjs",
+    "theme:build": "astryx theme build ./app/theme.ts",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build"
   },
