@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { ProgressBar } from '@astryxdesign/core/ProgressBar';
 
 const BUILD_STEPS = [
   { label: 'Selecting optimal layout',    icon: '🎨', duration: 800 },
@@ -124,21 +125,7 @@ export default function StepBuilding({ onComplete }: { onComplete: () => void })
 
       {/* Progress bar */}
       <div className="mb-4">
-        <div className="flex justify-between items-center mb-2">
-          <span className="text-xs tracking-[0.4px]" style={{ color: 'var(--md-on-surface-variant)' }}>
-            Progress
-          </span>
-          <span className="text-xs font-mono font-semibold text-foreground">{progress}%</span>
-        </div>
-        <div
-          className="h-1 overflow-hidden"
-          style={{ background: 'var(--md-surface-variant)', borderRadius: 'var(--md-shape-full)' }}
-        >
-          <div
-            className="h-full transition-all duration-500 ease-out"
-            style={{ width: `${progress}%`, background: 'var(--md-primary)', borderRadius: 'var(--md-shape-full)' }}
-          />
-        </div>
+        <ProgressBar label="Progress" value={progress} hasValueLabel />
       </div>
 
       {/* Notification */}

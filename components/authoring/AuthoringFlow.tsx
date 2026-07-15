@@ -1,7 +1,9 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState } from 'react';
 import { AppShell } from '@astryxdesign/core/AppShell';
+import { Carousel } from '@astryxdesign/core/Carousel';
+import { Button } from '@astryxdesign/core/Button';
 import AppSidebar, { type NavSection } from '@/components/shared/AppSidebar';
 import StepDataSource from './StepDataSource';
 import StepBreakdown from './StepBreakdown';
@@ -108,85 +110,13 @@ const BREAKDOWN_CHIPS = [
 ];
 
 function ChipCarousel({ chips, onSelect }: { chips: string[]; onSelect: () => void }) {
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const [canLeft, setCanLeft] = useState(false);
-  const [canRight, setCanRight] = useState(true);
-
-  const updateButtons = () => {
-    const el = scrollRef.current;
-    if (!el) return;
-    setCanLeft(el.scrollLeft > 2);
-    setCanRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 2);
-  };
-
-  useEffect(() => {
-    updateButtons();
-  }, [chips]);
-
-  const scroll = (dir: 'left' | 'right') => {
-    scrollRef.current?.scrollBy({ left: dir === 'left' ? -200 : 200, behavior: 'smooth' });
-  };
-
   return (
-    <div className="w-full max-w-[600px] flex items-center gap-2">
-      <button
-        onClick={() => scroll('left')}
-        className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-all"
-        style={{
-          border: '1px solid #e2e8f0',
-          background: 'white',
-          opacity: canLeft ? 1 : 0.35,
-          cursor: canLeft ? 'pointer' : 'default',
-          pointerEvents: canLeft ? 'auto' : 'none',
-        }}
-        aria-label="Previous suggestions"
-      >
-        <svg className="w-3.5 h-3.5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7"/>
-        </svg>
-      </button>
-
-      {/* min-w-0 is required so the flex child can shrink and actually scroll */}
-      <div
-        ref={scrollRef}
-        onScroll={updateButtons}
-        className="flex gap-2 flex-nowrap flex-1 min-w-0 overflow-x-auto [&::-webkit-scrollbar]:hidden"
-        style={{ scrollbarWidth: 'none' }}
-      >
+    <div className="w-full max-w-[600px]">
+      <Carousel gap={2} aria-label="Suggested prompts">
         {chips.map((chip) => (
-          <button
-            key={chip}
-            onClick={onSelect}
-            className="flex-shrink-0 text-sm whitespace-nowrap transition-colors hover:bg-slate-50"
-            style={{
-              padding: '8px 16px',
-              borderRadius: 9999,
-              border: '1px solid #e2e8f0',
-              background: 'white',
-              color: '#475569',
-            }}
-          >
-            {chip}
-          </button>
+          <Button key={chip} label={chip} variant="secondary" size="sm" onClick={onSelect} />
         ))}
-      </div>
-
-      <button
-        onClick={() => scroll('right')}
-        className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-all"
-        style={{
-          border: '1px solid #e2e8f0',
-          background: 'white',
-          opacity: canRight ? 1 : 0.35,
-          cursor: canRight ? 'pointer' : 'default',
-          pointerEvents: canRight ? 'auto' : 'none',
-        }}
-        aria-label="Next suggestions"
-      >
-        <svg className="w-3.5 h-3.5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/>
-        </svg>
-      </button>
+      </Carousel>
     </div>
   );
 }
