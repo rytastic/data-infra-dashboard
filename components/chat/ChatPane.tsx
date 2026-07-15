@@ -1,7 +1,16 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import ReactECharts from 'echarts-for-react';
+import { Button } from '@astryxdesign/core/Button';
+import { IconButton } from '@astryxdesign/core/IconButton';
+import {
+  ChatLayout,
+  ChatMessageList,
+  ChatMessage,
+  ChatMessageBubble,
+  ChatComposer,
+} from '@astryxdesign/core/Chat';
 import type { ChartMetric, PendingEdit } from '@/components/dashboard/types';
 
 interface Message {
@@ -217,22 +226,13 @@ export default function ChatPane({
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [overflowOpen, setOverflowOpen] = useState(false);
-  const bottomRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  // Close overflow popover when selection changes
-  useEffect(() => { setOverflowOpen(false); }, [selectedWidgets.length]);
-
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isTyping]);
 
   // Most-recently-selected widget drives command targeting
   const primaryWidget = selectedWidgets.length > 0 ? selectedWidgets[selectedWidgets.length - 1] : null;
 
   const visibleChips = selectedWidgets.slice(0, MAX_VISIBLE_CHIPS);
   const overflowCount = Math.max(0, selectedWidgets.length - MAX_VISIBLE_CHIPS);
-  const isEmptyState = messages.length === 1 && messages[0].role === 'assistant' && selectedWidgets.length === 0;
+  const isEmptyState = messages.length === 1 && messages[0].role === 'assistant' && selectedWidgets.length === 0 && pendingEdits.length === 0;
 
   const handleAccept = async () => {
     setMessages(prev => [...prev, { id: ++msgIdCounter, role: 'user', text: 'Accept', timestamp: new Date() }]);
@@ -274,208 +274,164 @@ export default function ChatPane({
     ]);
   };
 
+  const assistantAvatar = (
+    <div className="w-6 h-6 rounded-full bg-slate-900 flex items-center justify-center flex-shrink-0">
+      <StarIcon className="w-3 h-3 text-white" />
+    </div>
+  );
+
+  const suggestionPills = (() => {
+    const pills: string[] = [];
+    const chartWidgets = selectedWidgets.filter(w => w.isChart);
+    if (chartWidgets.length > 0) {
+      const allBar = chartWidgets.every(w => w.chartType === 'bar');
+      const allLine = chartWidgets.every(w => w.chartType === 'line');
+      if (!allBar) pills.push('Change to bar chart');
+      if (!allLine) pills.push('Change to line chart');
+    }
+    if (selectedWidgets.some(w => w.id === 'leaderboard')) {
+      pills.push('Sort by rebounds', 'Show top 5 players');
+    }
+    pills.push('Show rebounds', 'Highlight top scorer', 'Use ISU red');
+    return [...new Set(pills)].slice(0, 3);
+  })();
+
   return (
     <div className="flex flex-col h-full bg-white">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 flex-shrink-0">
         <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-full bg-slate-900 flex items-center justify-center">
-            <StarIcon className="w-3.5 h-3.5 text-white" />
-          </div>
+          {assistantAvatar}
           <span className="text-sm font-semibold text-slate-900">Data assistant</span>
         </div>
         <div className="flex items-center gap-0.5">
-          <button className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-400 transition-colors">
-            <PaperclipIcon className="w-4 h-4" />
-          </button>
-          <button className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-400 transition-colors">
-            <DotsIcon className="w-4 h-4" />
-          </button>
-          {onClose && (
-            <button
-              onClick={onClose}
-              className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors"
-              aria-label="Close"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          )}
+          <IconButton icon={<PaperclipIcon />} label="Attach" variant="ghost" />
+          <IconButton icon={<DotsIcon />} label="More options" variant="ghost" />
+          {onClose && <IconButton icon={<CloseIcon />} label="Close" variant="ghost" onClick={onClose} />}
         </div>
       </div>
 
-      {/* Messages / empty state */}
-      {isEmptyState ? (
-        <div className="flex-1 flex flex-col items-center justify-center px-6 pb-4 min-h-0">
-          <h2 className="text-2xl font-semibold text-slate-800 text-center mb-5">
-            {emptyHeading ?? 'Jump into the data…'}
-          </h2>
-          <div className="w-full space-y-2.5">
-            {(emptySuggestions ?? EMPTY_SUGGESTIONS).map(s => (
-              <button
-                key={s}
-                onClick={() => sendMessage(s)}
-                className="w-full text-left px-4 py-3.5 rounded-2xl bg-violet-100 hover:bg-violet-200 text-slate-700 text-sm leading-snug transition-colors"
-              >
-                {s}
-              </button>
-            ))}
-          </div>
-        </div>
-      ) : (
-        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3 min-h-0">
-          {messages.map(msg => (
-            <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              {msg.role === 'assistant' && (
-                <div className="w-6 h-6 rounded-full bg-slate-900 flex items-center justify-center flex-shrink-0 mr-2 mt-0.5">
-                  <StarIcon className="w-3 h-3 text-white" />
-                </div>
-              )}
-              <div
-                className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${
-                  msg.role === 'user'
-                    ? 'bg-slate-900 text-white rounded-tr-sm'
-                    : 'bg-slate-100 text-slate-800 rounded-tl-sm'
-                }`}
-              >
-                <FormattedText text={msg.text} />
-              </div>
-            </div>
-          ))}
+      <div className="flex-1 min-h-0">
+        <ChatLayout
+          composer={
+            <ChatComposer
+              value={input}
+              onChange={setInput}
+              onSubmit={sendMessage}
+              placeholder="Ask the data assistant…"
+              drawer={
+                selectedWidgets.length > 0 ? (
+                  <div className="px-1 pt-1">
+                    <div className="space-y-1.5">
+                      {visibleChips.map(widget => (
+                        <WidgetChip key={widget.id} label={widget.label} onRemove={() => onClearWidget(widget.id)} />
+                      ))}
+                    </div>
 
-          {isTyping && (
-            <div className="flex justify-start">
-              <div className="w-6 h-6 rounded-full bg-slate-900 flex items-center justify-center flex-shrink-0 mr-2 mt-0.5">
-                <StarIcon className="w-3 h-3 text-white" />
-              </div>
-              <div className="bg-slate-100 rounded-2xl rounded-tl-sm px-4 py-3 flex items-center gap-1.5">
-                {[0, 1, 2].map(i => (
-                  <div key={i} className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: `${i * 120}ms` }} />
-                ))}
-              </div>
-            </div>
-          )}
-          {/* Pending edits approval card */}
-          {pendingEdits.length > 0 && (
-            <div className="flex justify-start mt-1">
-              <div className="w-6 h-6 rounded-full bg-slate-900 flex items-center justify-center flex-shrink-0 mr-2 mt-1">
-                <StarIcon className="w-3 h-3 text-white" />
-              </div>
-              <EditsCard
-                edits={pendingEdits}
-                onAccept={handleAccept}
-                onDiscard={handleDiscard}
-              />
-            </div>
-          )}
-          <div ref={bottomRef} />
-        </div>
-      )}
+                    {overflowCount > 0 && (
+                      <div className="relative mt-1.5">
+                        <button
+                          onClick={() => setOverflowOpen(o => !o)}
+                          className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-slate-500 hover:text-slate-800 rounded-lg hover:bg-slate-100 transition-colors"
+                        >
+                          <svg
+                            className={`w-3.5 h-3.5 transition-transform duration-200 ${overflowOpen ? 'rotate-180' : ''}`}
+                            fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
+                          </svg>
+                          +{overflowCount} more
+                        </button>
 
-      {/* Widget context + suggestions */}
-      {selectedWidgets.length > 0 && (
-        <div className="px-4 py-3 border-t border-slate-100 flex-shrink-0">
-          {/* Stacked chips — max 3 visible */}
-          <div className="space-y-1.5">
-            {visibleChips.map(widget => (
-              <WidgetChip
-                key={widget.id}
-                label={widget.label}
-                onRemove={() => onClearWidget(widget.id)}
-              />
-            ))}
-          </div>
+                        {overflowOpen && (
+                          <div className="absolute bottom-full left-0 right-0 mb-2 bg-white border border-slate-200 rounded-2xl shadow-xl z-50 overflow-hidden">
+                            <div className="px-3 py-2 border-b border-slate-100 flex items-center justify-between">
+                              <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">
+                                All selected — {selectedWidgets.length} widgets
+                              </p>
+                              <button
+                                onClick={() => setOverflowOpen(false)}
+                                className="text-slate-400 hover:text-slate-700 transition-colors"
+                              >
+                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                              </button>
+                            </div>
+                            <div className="p-2 space-y-1.5 max-h-48 overflow-y-auto">
+                              {selectedWidgets.map(widget => (
+                                <WidgetChip key={widget.id} label={widget.label} onRemove={() => onClearWidget(widget.id)} />
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
 
-          {/* Overflow toggle */}
-          {overflowCount > 0 && (
-            <div className="relative mt-1.5">
-              <button
-                onClick={() => setOverflowOpen(o => !o)}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-slate-500 hover:text-slate-800 rounded-lg hover:bg-slate-100 transition-colors"
-              >
-                <svg
-                  className={`w-3.5 h-3.5 transition-transform duration-200 ${overflowOpen ? 'rotate-180' : ''}`}
-                  fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
-                </svg>
-                +{overflowCount} more
-              </button>
+                    <div className="my-2 border-t border-slate-200" />
 
-              {overflowOpen && (
-                <div className="absolute bottom-full left-0 right-0 mb-2 bg-white border border-slate-200 rounded-2xl shadow-xl z-50 overflow-hidden">
-                  <div className="px-3 py-2 border-b border-slate-100 flex items-center justify-between">
-                    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">
-                      All selected — {selectedWidgets.length} widgets
-                    </p>
+                    <div className="flex flex-wrap gap-2 pb-1">
+                      {suggestionPills.map(label => (
+                        <SuggestionPill key={label} label={label} onSend={sendMessage} />
+                      ))}
+                    </div>
+                  </div>
+                ) : undefined
+              }
+            />
+          }
+        >
+          <ChatMessageList
+            emptyState={
+              <div className="w-full px-2">
+                <h2 className="text-2xl font-semibold text-slate-800 text-center mb-5">
+                  {emptyHeading ?? 'Jump into the data…'}
+                </h2>
+                <div className="w-full space-y-2.5">
+                  {(emptySuggestions ?? EMPTY_SUGGESTIONS).map(s => (
                     <button
-                      onClick={() => setOverflowOpen(false)}
-                      className="text-slate-400 hover:text-slate-700 transition-colors"
+                      key={s}
+                      onClick={() => sendMessage(s)}
+                      className="w-full text-left px-4 py-3.5 rounded-2xl bg-violet-100 hover:bg-violet-200 text-slate-700 text-sm leading-snug transition-colors"
                     >
-                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                      </svg>
+                      {s}
                     </button>
-                  </div>
-                  <div className="p-2 space-y-1.5 max-h-48 overflow-y-auto">
-                    {selectedWidgets.map(widget => (
-                      <WidgetChip
-                        key={widget.id}
-                        label={widget.label}
-                        onRemove={() => { onClearWidget(widget.id); }}
-                      />
-                    ))}
-                  </div>
+                  ))}
                 </div>
-              )}
-            </div>
-          )}
-
-          <div className="my-3 border-t border-slate-200" />
-
-          {/* Suggestion pills — max 3, context-aware */}
-          <div className="flex flex-wrap gap-2">
-            {(() => {
-              const pills: string[] = [];
-              const chartWidgets = selectedWidgets.filter(w => w.isChart);
-              if (chartWidgets.length > 0) {
-                const allBar = chartWidgets.every(w => w.chartType === 'bar');
-                const allLine = chartWidgets.every(w => w.chartType === 'line');
-                if (!allBar) pills.push('Change to bar chart');
-                if (!allLine) pills.push('Change to line chart');
-              }
-              if (selectedWidgets.some(w => w.id === 'leaderboard')) {
-                pills.push('Sort by rebounds', 'Show top 5 players');
-              }
-              pills.push('Show rebounds', 'Highlight top scorer', 'Use ISU red');
-              return [...new Set(pills)].slice(0, 3).map(label => (
-                <SuggestionPill key={label} label={label} onSend={sendMessage} />
-              ));
-            })()}
-          </div>
-        </div>
-      )}
-
-      {/* Input */}
-      <div className="px-4 pb-4 pt-2 flex-shrink-0 border-t border-slate-100">
-        <div className="flex items-center gap-2 bg-slate-100 rounded-2xl px-3 py-2.5">
-          <input
-            ref={inputRef}
-            type="text"
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && sendMessage(input)}
-            placeholder="Ask the data assistant…"
-            className="flex-1 bg-transparent text-slate-800 placeholder-slate-400 text-sm outline-none"
-          />
-          <button
-            onClick={() => sendMessage(input)}
-            className="w-7 h-7 rounded-full bg-white shadow-sm flex items-center justify-center flex-shrink-0 text-slate-500 hover:text-slate-700 transition-colors"
+              </div>
+            }
           >
-            <StarIcon className="w-3.5 h-3.5" />
-          </button>
-        </div>
+            {!isEmptyState && (
+              <>
+                {messages.map(msg => (
+                  <ChatMessage key={msg.id} sender={msg.role} avatar={msg.role === 'assistant' ? assistantAvatar : undefined}>
+                    <ChatMessageBubble>
+                      <FormattedText text={msg.text} />
+                    </ChatMessageBubble>
+                  </ChatMessage>
+                ))}
+
+                {isTyping && (
+                  <ChatMessage sender="assistant" avatar={assistantAvatar}>
+                    <ChatMessageBubble>
+                      <div className="flex items-center gap-1.5 py-0.5">
+                        {[0, 1, 2].map(i => (
+                          <div key={i} className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: `${i * 120}ms` }} />
+                        ))}
+                      </div>
+                    </ChatMessageBubble>
+                  </ChatMessage>
+                )}
+
+                {pendingEdits.length > 0 && (
+                  <ChatMessage sender="assistant" avatar={assistantAvatar}>
+                    <EditsCard edits={pendingEdits} onAccept={handleAccept} onDiscard={handleDiscard} />
+                  </ChatMessage>
+                )}
+              </>
+            )}
+          </ChatMessageList>
+        </ChatLayout>
       </div>
     </div>
   );
@@ -520,7 +476,7 @@ function EditsCard({ edits, onAccept, onDiscard }: {
   }, []);
 
   return (
-    <div className="flex-1 max-w-[85%] rounded-2xl rounded-tl-sm bg-violet-50 overflow-hidden">
+    <div className="rounded-2xl rounded-tl-sm bg-violet-50 overflow-hidden">
       <div className="px-5 pt-5 pb-3">
         <h3 className="text-xl font-bold text-slate-800">Review edits</h3>
       </div>
@@ -545,13 +501,9 @@ function EditsCard({ edits, onAccept, onDiscard }: {
         ))}
       </div>
 
-      <div className="flex items-center justify-end gap-5 px-5 py-3 border-t border-violet-200">
-        <button onClick={onDiscard} className="text-sm font-medium text-violet-500 hover:text-violet-800 transition-colors">
-          Discard all
-        </button>
-        <button onClick={onAccept} className="text-sm font-semibold text-violet-600 hover:text-violet-900 transition-colors">
-          Accept
-        </button>
+      <div className="flex items-center justify-end gap-3 px-5 py-3 border-t border-violet-200">
+        <Button label="Discard all" variant="ghost" onClick={onDiscard} />
+        <Button label="Accept" variant="primary" onClick={onAccept} />
       </div>
 
       {/* Fixed-position before/after popover */}
@@ -651,18 +603,26 @@ function StarIcon({ className }: { className?: string }) {
   );
 }
 
-function PaperclipIcon({ className }: { className?: string }) {
+function PaperclipIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} {...props}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
     </svg>
   );
 }
 
-function DotsIcon({ className }: { className?: string }) {
+function DotsIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
-    <svg className={className} fill="currentColor" viewBox="0 0 24 24">
+    <svg fill="currentColor" viewBox="0 0 24 24" {...props}>
       <circle cx="5" cy="12" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="19" cy="12" r="2" />
+    </svg>
+  );
+}
+
+function CloseIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} {...props}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
     </svg>
   );
 }
