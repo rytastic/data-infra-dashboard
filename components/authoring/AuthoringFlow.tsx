@@ -109,12 +109,12 @@ const BREAKDOWN_CHIPS = [
   'Add player headshots',
 ];
 
-function ChipCarousel({ chips, onSelect }: { chips: string[]; onSelect: () => void }) {
+function ChipCarousel({ chips, onSelect }: { chips: string[]; onSelect: (chip: string) => void }) {
   return (
     <div className="w-full max-w-[600px]">
       <Carousel gap={2} aria-label="Suggested prompts">
         {chips.map((chip) => (
-          <Button key={chip} label={chip} variant="secondary" size="sm" onClick={onSelect} />
+          <Button key={chip} label={chip} variant="secondary" size="sm" onClick={() => onSelect(chip)} />
         ))}
       </Carousel>
     </div>
@@ -353,7 +353,7 @@ export default function AuthoringFlow() {
                         availableDashboards={availableDashboards}
                         onRemoveSource={handleRemoveSource}
                         onAddSource={handleAddSource}
-                        placeholder="Select data source(s) or ask a data question"
+                        placeholder="Select data sources above or with @, or ask a data question"
                         inputValue={datasourcePromptValue}
                         ctaLabel={datasourceHasPrompt ? 'Create dash' : 'Next'}
                         ctaEnabled={selectedSources.length > 0 || datasourceHasPrompt}
@@ -382,9 +382,9 @@ export default function AuthoringFlow() {
                   {/* Suggested prompts — horizontal pill carousel with nav buttons */}
                   <ChipCarousel
                     chips={step === 'datasource' ? DATASOURCE_CHIPS : BREAKDOWN_CHIPS}
-                    onSelect={() => {
-                      if (step === 'datasource') setStep('breakdown');
-                      if (step === 'breakdown') setStep('building');
+                    onSelect={(chip) => {
+                      if (step === 'datasource') setDatasourcePromptValue(chip);
+                      if (step === 'breakdown') setPromptInputValue(chip);
                     }}
                   />
                 </>
