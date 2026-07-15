@@ -22,7 +22,7 @@ const preview: Preview = {
   },
   decorators: [
     (Story) => (
-      <Theme theme={appTheme}>
+      <Theme theme={appTheme} mode="light">
         <Story />
       </Theme>
     ),
