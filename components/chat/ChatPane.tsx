@@ -392,7 +392,7 @@ export default function ChatPane({
                     <button
                       key={s}
                       onClick={() => sendMessage(s)}
-                      className="w-full text-left px-4 py-3.5 rounded-2xl bg-violet-100 hover:bg-violet-200 text-slate-700 text-sm leading-snug transition-colors"
+                      className="w-full text-left px-4 py-3.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm leading-snug transition-colors"
                     >
                       {s}
                     </button>
@@ -476,7 +476,7 @@ function EditsCard({ edits, onAccept, onDiscard }: {
   }, []);
 
   return (
-    <div className="rounded-2xl rounded-tl-sm bg-violet-50 overflow-hidden">
+    <div className="rounded-2xl rounded-tl-sm bg-slate-100 overflow-hidden">
       <div className="px-5 pt-5 pb-3">
         <h3 className="text-xl font-bold text-slate-800">Review edits</h3>
       </div>
@@ -484,9 +484,9 @@ function EditsCard({ edits, onAccept, onDiscard }: {
       <div className="px-3 pb-3">
         {edits.map((edit, i) => (
           <div key={edit.id}>
-            {i > 0 && <div className="border-t border-violet-200 mx-2" />}
+            {i > 0 && <div className="border-t border-slate-200 mx-2" />}
             <div
-              className="flex items-center justify-between px-2 py-3 gap-3 rounded-xl hover:bg-violet-100 transition-colors cursor-default"
+              className="flex items-center justify-between px-2 py-3 gap-3 rounded-xl hover:bg-slate-200 transition-colors cursor-default"
               onMouseEnter={(e) => handleMouseEnter(e, edit)}
               onMouseLeave={() => setHovered(null)}
             >
@@ -497,7 +497,7 @@ function EditsCard({ edits, onAccept, onDiscard }: {
                 </svg>
                 <span className="text-sm text-slate-700 leading-snug truncate">{edit.description}</span>
               </div>
-              <div className="w-5 h-5 rounded flex-shrink-0 flex items-center justify-center bg-violet-500">
+              <div className="w-5 h-5 rounded flex-shrink-0 flex items-center justify-center bg-slate-800">
                 <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                 </svg>
@@ -507,7 +507,7 @@ function EditsCard({ edits, onAccept, onDiscard }: {
         ))}
       </div>
 
-      <div className="flex items-center justify-end gap-3 px-5 py-3 border-t border-violet-200">
+      <div className="flex items-center justify-end gap-3 px-5 py-3 border-t border-slate-200">
         <Button label="Discard all" variant="ghost" onClick={onDiscard} />
         <Button label="Accept" variant="primary" onClick={onAccept} />
       </div>
