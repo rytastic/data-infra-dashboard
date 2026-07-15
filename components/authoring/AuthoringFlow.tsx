@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { AppShell } from '@astryxdesign/core/AppShell';
 import AppSidebar, { type NavSection } from '@/components/shared/AppSidebar';
 import StepDataSource from './StepDataSource';
 import StepBreakdown from './StepBreakdown';
@@ -326,18 +327,22 @@ export default function AuthoringFlow() {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden">
-      <AppSidebar
-        sections={sections}
-        activeId={activeNavId}
-        collapsed={sidebarCollapsed}
-        onItemClick={handleNavItemClick}
-        onNewDash={handleNewDash}
-        onToggleCollapse={handleToggleCollapse}
-      />
-
+    <AppShell
+      height="fill"
+      contentPadding={0}
+      sideNav={
+        <AppSidebar
+          sections={sections}
+          activeId={activeNavId}
+          collapsed={sidebarCollapsed}
+          onItemClick={handleNavItemClick}
+          onNewDash={handleNewDash}
+          onToggleCollapse={handleToggleCollapse}
+        />
+      }
+    >
       <div
-        className="flex-1 flex flex-col min-h-0 overflow-hidden"
+        className="flex flex-col h-full min-h-0 overflow-hidden"
         style={{ background: '#f1f5f9' }}
       >
         {step === 'dashboard' && (
@@ -459,6 +464,6 @@ export default function AuthoringFlow() {
           </>
         )}
       </div>
-    </div>
+    </AppShell>
   );
 }
