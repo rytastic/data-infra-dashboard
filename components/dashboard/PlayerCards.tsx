@@ -1,5 +1,8 @@
 'use client';
 
+import { Card } from '@astryxdesign/core/Card';
+import { Avatar } from '@astryxdesign/core/Avatar';
+import { Badge } from '@astryxdesign/core/Badge';
 import type { Player } from './types';
 import SelectableWidget from './SelectableWidget';
 
@@ -18,24 +21,16 @@ export default function PlayerCards({ players, highlightedPlayer, selectedWidget
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
       {top3.map((player, i) => {
-        const isHighlighted = highlightedPlayer !== null &&
-          player.name.toLowerCase().includes(highlightedPlayer.toLowerCase());
+        const isHighlighted = highlightedPlayer !== null && player.name.toLowerCase().includes(highlightedPlayer.toLowerCase());
         const widgetId = `player-${player.name.replace(/\s+/g, '-').toLowerCase()}`;
 
         return (
-          <SelectableWidget
-            key={player.name}
-            id={widgetId}
-            selectedIds={selectedWidgetIds}
-            onSelect={(id, shiftKey) => onWidgetSelect?.(id, shiftKey)}
-          >
-            <div className="rounded-xl border bg-white border-slate-200 p-5 transition-all duration-300">
+          <SelectableWidget key={player.name} id={widgetId} selectedIds={selectedWidgetIds} onSelect={(id, shiftKey) => onWidgetSelect?.(id, shiftKey)}>
+            <Card padding={5}>
               {/* Header */}
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-11 h-11 rounded-full flex items-center justify-center text-lg font-bold bg-slate-100 text-slate-600">
-                    {player.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
-                  </div>
+                  <Avatar name={player.name} size="medium" />
                   <div>
                     <p className="font-bold text-sm text-slate-800">{player.name}</p>
                     <p className="text-slate-400 text-xs">{player.position} · {player.games}G played</p>
@@ -61,11 +56,11 @@ export default function PlayerCards({ players, highlightedPlayer, selectedWidget
               </div>
 
               {isHighlighted && (
-                <div className="mt-3 text-center text-xs font-semibold py-1.5 rounded-lg bg-[#3b82f6]/20 text-[#3b82f6]">
-                  ★ Highlighted
+                <div className="mt-3 flex justify-center">
+                  <Badge label="Highlighted" variant="info" />
                 </div>
               )}
-            </div>
+            </Card>
           </SelectableWidget>
         );
       })}
