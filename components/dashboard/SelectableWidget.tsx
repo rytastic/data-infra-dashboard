@@ -52,13 +52,29 @@ export default function SelectableWidget({
       )}
       {onEdit && isHovered && (
         <div className="absolute top-3 right-3 z-10">
-          <Button
-            label="Edit"
-            icon={<PencilGlyph />}
-            variant="secondary"
-            size="sm"
-            onClick={(e) => { e.stopPropagation(); onEdit(id); }}
-          />
+          <div className="relative">
+            <div
+              aria-hidden="true"
+              className="absolute pointer-events-none"
+              style={{
+                top: '-15%',
+                right: '-15%',
+                bottom: '-25%',
+                left: '-70%',
+                zIndex: 0,
+                background: 'radial-gradient(ellipse 85% 85% at 68% 42%, rgba(255,255,255,0.95) 40%, rgba(255,255,255,0) 78%)',
+              }}
+            />
+            <div className="relative" style={{ zIndex: 1 }}>
+              <Button
+                label="Edit"
+                icon={<PencilGlyph />}
+                variant="secondary"
+                size="sm"
+                onClick={(e) => { e.stopPropagation(); onEdit(id); }}
+              />
+            </div>
+          </div>
         </div>
       )}
     </div>
