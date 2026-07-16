@@ -450,7 +450,7 @@ export default function PromptInput({
             }}
             onKeyDown={handleKey}
             placeholder={placeholder}
-            className="flex-1 bg-transparent text-sm text-slate-700 placeholder:text-slate-400 outline-none"
+            className="flex-1 bg-transparent text-base text-slate-700 placeholder:text-slate-400 outline-none"
           />
 
           {mention && mentionAnchor && (
