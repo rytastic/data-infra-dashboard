@@ -168,7 +168,7 @@ export default function StepBreakdown({ onSubmit, onBack, onSelectionChange }: P
                   label={b.title}
                   description={b.subtitle}
                   startContent={
-                    <div className="flex-shrink-0 rounded-xl overflow-hidden" style={{ width: 88, height: 62 }}>
+                    <div className="flex-shrink-0 rounded-xl overflow-hidden ml-3" style={{ width: 88, height: 62 }}>
                       <Thumb />
                     </div>
                   }
