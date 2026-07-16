@@ -64,7 +64,7 @@ export default function SelectableWidget({
                   top: '-8%',
                   right: '-8%',
                   bottom: '-12%',
-                  left: '-45%',
+                  left: '-18%',
                   zIndex: 0,
                   background: 'radial-gradient(ellipse 90% 90% at 64% 46%, rgba(255,255,255,0.95) 65%, rgba(255,255,255,0) 88%)',
                 }}
