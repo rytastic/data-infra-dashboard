@@ -2,6 +2,10 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { Layout, LayoutContent, LayoutPanel } from '@astryxdesign/core/Layout';
+import { TabList, Tab } from '@astryxdesign/core/TabList';
+import { IconButton } from '@astryxdesign/core/IconButton';
+import { Icon } from '@astryxdesign/core/Icon';
+import { type SelectorOptionType } from '@astryxdesign/core/Selector';
 import cyclonesData from '@/data/cyclones.json';
 import TEAMS from '@/data/teams';
 import StatsBar from './StatsBar';
@@ -10,10 +14,16 @@ import TrendChart from './TrendChart';
 import ComparisonChart from './ComparisonChart';
 import PlayerCards from './PlayerCards';
 import SelectableWidget from './SelectableWidget';
+import ManualEditPane from './ManualEditPane';
 import ChatPane, { type ParsedCommand, type WidgetContext } from '@/components/chat/ChatPane';
 import type { CyclonesData, ChartMetric, PendingEdit, Season, Player } from './types';
 
 const fallbackData = cyclonesData as CyclonesData;
+
+// All selectable "teams" a widget's data source can point at, including the
+// Iowa State fallback dataset that isn't part of the TEAMS record.
+const ALL_TEAMS: Record<string, CyclonesData> = { 'iowa-state': fallbackData, ...TEAMS };
+const TEAM_ORDER = ['iowa-state', 'kansas', 'tcu', 'arizona', 'byu', 'houston'];
 
 const MINI_PALETTE = ['#F02849', '#FFAD0F', '#8A3FC7'];
 
@@ -62,6 +72,7 @@ const WIDGET_META: Record<string, { label: string; isChart: boolean }> = {
 };
 
 export type DashboardLayout = 'overview' | 'player-comparison' | 'top-scorers';
+type RightPaneTab = 'chat' | 'edit';
 
 interface Props {
   isPreview?: boolean;
@@ -109,6 +120,12 @@ export default function Dashboard({
     highlightedPlayer: string | null;
   } | null>(null);
 
+  // Manual (non-chat) per-widget editing: which widget's edit pane is showing,
+  // which tab is active, and per-widget team/season data-source overrides.
+  const [rightPaneTab, setRightPaneTab] = useState<RightPaneTab>('chat');
+  const [manualEditWidgetId, setManualEditWidgetId] = useState<string | null>(null);
+  const [widgetDataOverrides, setWidgetDataOverrides] = useState<Record<string, { teamId: string; year?: string }>>({});
+
   const handleWidgetSelect = (id: string, shiftKey = false) => {
     setSelectedWidgets(prev => {
       if (shiftKey) {
@@ -129,6 +146,9 @@ export default function Dashboard({
     setLeaderboardLimit(null);
     setAccentColor('#3b82f6');
     setWidgetTitles({});
+    setManualEditWidgetId(null);
+    setRightPaneTab('chat');
+    setWidgetDataOverrides({});
   }, [teamId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const season = useMemo(
@@ -143,6 +163,19 @@ export default function Dashboard({
     }
     return highlightedPlayer;
   }, [highlightedPlayer, season]);
+
+  // Resolves a widget's effective team/season: its own data-source override
+  // if one has been set via the manual edit pane, else the dashboard default.
+  const resolveWidgetTeamData = (widgetId: string): CyclonesData => {
+    const override = widgetDataOverrides[widgetId];
+    if (override && ALL_TEAMS[override.teamId]) return ALL_TEAMS[override.teamId];
+    return data;
+  };
+  const resolveWidgetSeason = (widgetId: string): Season => {
+    const teamData = resolveWidgetTeamData(widgetId);
+    const year = widgetDataOverrides[widgetId]?.year ?? selectedYear;
+    return teamData.seasons.find(s => s.year === year) ?? teamData.seasons[teamData.seasons.length - 1];
+  };
 
   const widgetContexts: WidgetContext[] = selectedWidgets.map(id => ({
     id,
@@ -270,6 +303,69 @@ export default function Dashboard({
     // keep widget selection so the user can continue editing
   };
 
+  // Manual edit pane wiring — independent of the chat multi-select above.
+  // Only one widget can be manually edited at a time; retargeting only
+  // happens by hovering a different widget and clicking its Edit button.
+  const handleEditWidget = (id: string) => {
+    setManualEditWidgetId(id);
+    setRightPaneTab('edit');
+    if (!chatOpen) setChatOpen(true);
+  };
+
+  const manualEditMeta = manualEditWidgetId
+    ? (WIDGET_META[manualEditWidgetId] ?? { label: manualEditWidgetId, isChart: false })
+    : null;
+  const manualEditIsTrend = manualEditWidgetId === 'trend-chart';
+
+  const dataSourceOptions: SelectorOptionType[] = manualEditWidgetId
+    ? manualEditIsTrend
+      ? TEAM_ORDER.map(id => ({ value: id, label: ALL_TEAMS[id].team }))
+      : TEAM_ORDER.map(id => ({
+          type: 'section' as const,
+          title: ALL_TEAMS[id].team,
+          options: ALL_TEAMS[id].seasons.map(s => ({ value: `${id}::${s.year}`, label: s.year })),
+        }))
+    : [];
+
+  const defaultTeamKey = teamId && TEAMS[teamId] ? teamId : 'iowa-state';
+  const currentOverride = manualEditWidgetId ? widgetDataOverrides[manualEditWidgetId] : undefined;
+  const currentTeamKey = currentOverride?.teamId ?? defaultTeamKey;
+  const dataSourceValue = manualEditWidgetId
+    ? (manualEditIsTrend ? currentTeamKey : `${currentTeamKey}::${currentOverride?.year ?? selectedYear}`)
+    : '';
+
+  const handleDataSourceChange = (value: string) => {
+    if (!manualEditWidgetId) return;
+    if (manualEditIsTrend) {
+      setWidgetDataOverrides(prev => ({ ...prev, [manualEditWidgetId]: { teamId: value } }));
+    } else {
+      const [teamKey, year] = value.split('::');
+      setWidgetDataOverrides(prev => ({ ...prev, [manualEditWidgetId]: { teamId: teamKey, year } }));
+    }
+  };
+
+  const handleManualTitleChange = (value: string) => {
+    if (!manualEditWidgetId) return;
+    setWidgetTitles(prev => {
+      if (value.trim() === '') {
+        const next = { ...prev };
+        delete next[manualEditWidgetId];
+        return next;
+      }
+      return { ...prev, [manualEditWidgetId]: value };
+    });
+  };
+
+  const manualEditChartType = manualEditWidgetId === 'trend-chart'
+    ? trendChartType
+    : manualEditWidgetId === 'comparison-chart'
+      ? compChartType
+      : undefined;
+  const handleManualChartTypeChange = (value: 'line' | 'bar') => {
+    if (manualEditWidgetId === 'trend-chart') setTrendChartType(value);
+    else if (manualEditWidgetId === 'comparison-chart') setCompChartType(value as 'bar' | 'line');
+  };
+
   return (
     <Layout
       height="fill"
@@ -324,38 +420,38 @@ export default function Dashboard({
           {layout === 'overview' && (
             <>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <SelectableWidget id="trend-chart" selectedIds={selectedWidgets} pendingIds={pendingWidgetIds} onSelect={handleWidgetSelect}>
-                  <TrendChart seasons={data.seasons} metric={chartMetric} chartType={trendChartType} accentColor={accentColor} title={widgetTitles['trend-chart']} />
+                <SelectableWidget id="trend-chart" selectedIds={selectedWidgets} pendingIds={pendingWidgetIds} onSelect={handleWidgetSelect} onEdit={handleEditWidget}>
+                  <TrendChart seasons={resolveWidgetTeamData('trend-chart').seasons} metric={chartMetric} chartType={trendChartType} accentColor={accentColor} title={widgetTitles['trend-chart']} />
                 </SelectableWidget>
-                <SelectableWidget id="comparison-chart" selectedIds={selectedWidgets} pendingIds={pendingWidgetIds} onSelect={handleWidgetSelect}>
-                  <ComparisonChart season={season} metric={chartMetric} highlightedPlayer={resolvedHighlight} chartType={compChartType} accentColor={accentColor} title={widgetTitles['comparison-chart']} />
+                <SelectableWidget id="comparison-chart" selectedIds={selectedWidgets} pendingIds={pendingWidgetIds} onSelect={handleWidgetSelect} onEdit={handleEditWidget}>
+                  <ComparisonChart season={resolveWidgetSeason('comparison-chart')} metric={chartMetric} highlightedPlayer={resolvedHighlight} chartType={compChartType} accentColor={accentColor} title={widgetTitles['comparison-chart']} />
                 </SelectableWidget>
               </div>
-              <SelectableWidget id="stats" selectedIds={selectedWidgets} pendingIds={pendingWidgetIds} onSelect={handleWidgetSelect}>
-                <StatsBar season={season} />
+              <SelectableWidget id="stats" selectedIds={selectedWidgets} pendingIds={pendingWidgetIds} onSelect={handleWidgetSelect} onEdit={handleEditWidget}>
+                <StatsBar season={resolveWidgetSeason('stats')} />
               </SelectableWidget>
-              <SelectableWidget id="player-cards" selectedIds={selectedWidgets} pendingIds={pendingWidgetIds} onSelect={handleWidgetSelect}>
+              <SelectableWidget id="player-cards" selectedIds={selectedWidgets} pendingIds={pendingWidgetIds} onSelect={handleWidgetSelect} onEdit={handleEditWidget}>
                 <div className="bg-white rounded-xl border border-slate-200 p-5">
-                  <h2 className="text-slate-800 font-bold text-sm uppercase tracking-wider mb-3">Top Performers · {season.year}</h2>
-                  <PlayerCards players={season.players} highlightedPlayer={resolvedHighlight} selectedWidgetIds={selectedWidgets} onWidgetSelect={handleWidgetSelect} />
+                  <h2 className="text-slate-800 font-bold text-sm uppercase tracking-wider mb-3">Top Performers · {resolveWidgetSeason('player-cards').year}</h2>
+                  <PlayerCards players={resolveWidgetSeason('player-cards').players} highlightedPlayer={resolvedHighlight} selectedWidgetIds={selectedWidgets} onWidgetSelect={handleWidgetSelect} />
                 </div>
               </SelectableWidget>
-              <LeaderboardWidget season={season} selectedWidgets={selectedWidgets} pendingWidgetIds={pendingWidgetIds} handleWidgetSelect={handleWidgetSelect} resolvedHighlight={resolvedHighlight} setHighlightedPlayer={setHighlightedPlayer} chartMetric={chartMetric} leaderboardSort={leaderboardSort} leaderboardLimit={leaderboardLimit} />
+              <LeaderboardWidget season={resolveWidgetSeason('leaderboard')} selectedWidgets={selectedWidgets} pendingWidgetIds={pendingWidgetIds} handleWidgetSelect={handleWidgetSelect} resolvedHighlight={resolvedHighlight} setHighlightedPlayer={setHighlightedPlayer} chartMetric={chartMetric} leaderboardSort={leaderboardSort} leaderboardLimit={leaderboardLimit} onEdit={handleEditWidget} />
             </>
           )}
 
           {/* ── PLAYER-COMPARISON: leaderboard → player cards → bar chart ── */}
           {layout === 'player-comparison' && (
             <>
-              <LeaderboardWidget season={season} selectedWidgets={selectedWidgets} pendingWidgetIds={pendingWidgetIds} handleWidgetSelect={handleWidgetSelect} resolvedHighlight={resolvedHighlight} setHighlightedPlayer={setHighlightedPlayer} chartMetric={chartMetric} leaderboardSort={leaderboardSort} leaderboardLimit={leaderboardLimit} />
-              <SelectableWidget id="player-cards" selectedIds={selectedWidgets} pendingIds={pendingWidgetIds} onSelect={handleWidgetSelect}>
+              <LeaderboardWidget season={resolveWidgetSeason('leaderboard')} selectedWidgets={selectedWidgets} pendingWidgetIds={pendingWidgetIds} handleWidgetSelect={handleWidgetSelect} resolvedHighlight={resolvedHighlight} setHighlightedPlayer={setHighlightedPlayer} chartMetric={chartMetric} leaderboardSort={leaderboardSort} leaderboardLimit={leaderboardLimit} onEdit={handleEditWidget} />
+              <SelectableWidget id="player-cards" selectedIds={selectedWidgets} pendingIds={pendingWidgetIds} onSelect={handleWidgetSelect} onEdit={handleEditWidget}>
                 <div className="bg-white rounded-xl border border-slate-200 p-5">
-                  <h2 className="text-slate-800 font-bold text-sm uppercase tracking-wider mb-3">Top Performers · {season.year}</h2>
-                  <PlayerCards players={season.players} highlightedPlayer={resolvedHighlight} selectedWidgetIds={selectedWidgets} onWidgetSelect={handleWidgetSelect} />
+                  <h2 className="text-slate-800 font-bold text-sm uppercase tracking-wider mb-3">Top Performers · {resolveWidgetSeason('player-cards').year}</h2>
+                  <PlayerCards players={resolveWidgetSeason('player-cards').players} highlightedPlayer={resolvedHighlight} selectedWidgetIds={selectedWidgets} onWidgetSelect={handleWidgetSelect} />
                 </div>
               </SelectableWidget>
-              <SelectableWidget id="comparison-chart" selectedIds={selectedWidgets} pendingIds={pendingWidgetIds} onSelect={handleWidgetSelect}>
-                <ComparisonChart season={season} metric={chartMetric} highlightedPlayer={resolvedHighlight} chartType={compChartType} accentColor={accentColor} title={widgetTitles['comparison-chart']} />
+              <SelectableWidget id="comparison-chart" selectedIds={selectedWidgets} pendingIds={pendingWidgetIds} onSelect={handleWidgetSelect} onEdit={handleEditWidget}>
+                <ComparisonChart season={resolveWidgetSeason('comparison-chart')} metric={chartMetric} highlightedPlayer={resolvedHighlight} chartType={compChartType} accentColor={accentColor} title={widgetTitles['comparison-chart']} />
               </SelectableWidget>
             </>
           )}
@@ -363,21 +459,21 @@ export default function Dashboard({
           {/* ── TOP-SCORERS: stats → charts → player cards ── */}
           {layout === 'top-scorers' && (
             <>
-              <SelectableWidget id="stats" selectedIds={selectedWidgets} pendingIds={pendingWidgetIds} onSelect={handleWidgetSelect}>
-                <StatsBar season={season} />
+              <SelectableWidget id="stats" selectedIds={selectedWidgets} pendingIds={pendingWidgetIds} onSelect={handleWidgetSelect} onEdit={handleEditWidget}>
+                <StatsBar season={resolveWidgetSeason('stats')} />
               </SelectableWidget>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <SelectableWidget id="trend-chart" selectedIds={selectedWidgets} pendingIds={pendingWidgetIds} onSelect={handleWidgetSelect}>
-                  <TrendChart seasons={data.seasons} metric={chartMetric} chartType={trendChartType} accentColor={accentColor} title={widgetTitles['trend-chart']} />
+                <SelectableWidget id="trend-chart" selectedIds={selectedWidgets} pendingIds={pendingWidgetIds} onSelect={handleWidgetSelect} onEdit={handleEditWidget}>
+                  <TrendChart seasons={resolveWidgetTeamData('trend-chart').seasons} metric={chartMetric} chartType={trendChartType} accentColor={accentColor} title={widgetTitles['trend-chart']} />
                 </SelectableWidget>
-                <SelectableWidget id="comparison-chart" selectedIds={selectedWidgets} pendingIds={pendingWidgetIds} onSelect={handleWidgetSelect}>
-                  <ComparisonChart season={season} metric={chartMetric} highlightedPlayer={resolvedHighlight} chartType={compChartType} accentColor={accentColor} title={widgetTitles['comparison-chart']} />
+                <SelectableWidget id="comparison-chart" selectedIds={selectedWidgets} pendingIds={pendingWidgetIds} onSelect={handleWidgetSelect} onEdit={handleEditWidget}>
+                  <ComparisonChart season={resolveWidgetSeason('comparison-chart')} metric={chartMetric} highlightedPlayer={resolvedHighlight} chartType={compChartType} accentColor={accentColor} title={widgetTitles['comparison-chart']} />
                 </SelectableWidget>
               </div>
-              <SelectableWidget id="player-cards" selectedIds={selectedWidgets} pendingIds={pendingWidgetIds} onSelect={handleWidgetSelect}>
+              <SelectableWidget id="player-cards" selectedIds={selectedWidgets} pendingIds={pendingWidgetIds} onSelect={handleWidgetSelect} onEdit={handleEditWidget}>
                 <div className="bg-white rounded-xl border border-slate-200 p-5">
-                  <h2 className="text-slate-800 font-bold text-sm uppercase tracking-wider mb-3">Top Performers · {season.year}</h2>
-                  <PlayerCards players={season.players} highlightedPlayer={resolvedHighlight} selectedWidgetIds={selectedWidgets} onWidgetSelect={handleWidgetSelect} />
+                  <h2 className="text-slate-800 font-bold text-sm uppercase tracking-wider mb-3">Top Performers · {resolveWidgetSeason('player-cards').year}</h2>
+                  <PlayerCards players={resolveWidgetSeason('player-cards').players} highlightedPlayer={resolvedHighlight} selectedWidgetIds={selectedWidgets} onWidgetSelect={handleWidgetSelect} />
                 </div>
               </SelectableWidget>
             </>
@@ -391,19 +487,55 @@ export default function Dashboard({
       end={
         !isPreview && chatOpen ? (
           <LayoutPanel width={384} hasDivider padding={0} isScrollable={false}>
-            <ChatPane
-              onCommand={handleCommand}
-              onClose={() => setChatOpen(false)}
-              chartMetric={chartMetric}
-              highlightedPlayer={resolvedHighlight}
-              selectedWidgets={widgetContexts}
-              onClearWidget={(id) => setSelectedWidgets(prev => prev.filter(w => w !== id))}
-              pendingEdits={pendingEdits}
-              onAcceptEdits={handleAcceptEdits}
-              onDiscardEdits={handleDiscardEdits}
-              emptyHeading={startWithCloneSuggestion ? 'Ready to update' : undefined}
-              emptySuggestions={startWithCloneSuggestion ? ['Update with current half data'] : undefined}
-            />
+            <div className="flex flex-col h-full">
+              <TabList value={rightPaneTab} onChange={(v) => setRightPaneTab(v as RightPaneTab)} hasDivider size="sm">
+                <Tab value="chat" label="Chat" />
+                {manualEditWidgetId && (
+                  <>
+                    <Tab value="edit" label="Edit" />
+                    <IconButton
+                      icon={<Icon icon="close" size="sm" />}
+                      label="Close edit tab"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => { setManualEditWidgetId(null); setRightPaneTab('chat'); }}
+                    />
+                  </>
+                )}
+              </TabList>
+
+              <div className="flex-1 min-h-0" style={{ display: rightPaneTab === 'chat' ? 'block' : 'none' }}>
+                <ChatPane
+                  onCommand={handleCommand}
+                  onClose={() => setChatOpen(false)}
+                  chartMetric={chartMetric}
+                  highlightedPlayer={resolvedHighlight}
+                  selectedWidgets={widgetContexts}
+                  onClearWidget={(id) => setSelectedWidgets(prev => prev.filter(w => w !== id))}
+                  pendingEdits={pendingEdits}
+                  onAcceptEdits={handleAcceptEdits}
+                  onDiscardEdits={handleDiscardEdits}
+                  emptyHeading={startWithCloneSuggestion ? 'Ready to update' : undefined}
+                  emptySuggestions={startWithCloneSuggestion ? ['Update with current half data'] : undefined}
+                />
+              </div>
+
+              {manualEditWidgetId && manualEditMeta && (
+                <div className="flex-1 min-h-0" style={{ display: rightPaneTab === 'edit' ? 'block' : 'none' }}>
+                  <ManualEditPane
+                    widgetLabel={manualEditMeta.label}
+                    titleValue={widgetTitles[manualEditWidgetId] ?? ''}
+                    onTitleChange={handleManualTitleChange}
+                    isChart={manualEditMeta.isChart}
+                    chartType={manualEditChartType}
+                    onChartTypeChange={handleManualChartTypeChange}
+                    dataSourceValue={dataSourceValue}
+                    dataSourceOptions={dataSourceOptions}
+                    onDataSourceChange={handleDataSourceChange}
+                  />
+                </div>
+              )}
+            </div>
           </LayoutPanel>
         ) : undefined
       }
@@ -411,7 +543,7 @@ export default function Dashboard({
   );
 }
 
-function LeaderboardWidget({ season, selectedWidgets, pendingWidgetIds, handleWidgetSelect, resolvedHighlight, setHighlightedPlayer, chartMetric, leaderboardSort, leaderboardLimit }: {
+function LeaderboardWidget({ season, selectedWidgets, pendingWidgetIds, handleWidgetSelect, resolvedHighlight, setHighlightedPlayer, chartMetric, leaderboardSort, leaderboardLimit, onEdit }: {
   season: import('./types').Season;
   selectedWidgets: string[];
   pendingWidgetIds: string[];
@@ -421,9 +553,10 @@ function LeaderboardWidget({ season, selectedWidgets, pendingWidgetIds, handleWi
   chartMetric: import('./types').ChartMetric;
   leaderboardSort: string;
   leaderboardLimit: number | null;
+  onEdit?: (id: string) => void;
 }) {
   return (
-    <SelectableWidget id="leaderboard" selectedIds={selectedWidgets} pendingIds={pendingWidgetIds} onSelect={handleWidgetSelect}>
+    <SelectableWidget id="leaderboard" selectedIds={selectedWidgets} pendingIds={pendingWidgetIds} onSelect={handleWidgetSelect} onEdit={onEdit}>
       <div className="bg-white rounded-xl border border-slate-200 p-5">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-slate-800 font-bold text-sm uppercase tracking-wider">Player Leaderboard</h2>
