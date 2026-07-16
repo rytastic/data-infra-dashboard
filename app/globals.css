@@ -201,4 +201,12 @@ html, body { height: 100%; }
 /* ─── Scrollbar ─────────────────────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
+
+/* ─── RadioListItem start-content alignment ────────────────────────────────────
+   Astryx's Item primitive doesn't center the radio circle against a taller
+   startContent sibling (e.g. a thumbnail preview) — it defaults to top-aligned.
+   Scoped to radio list items only via Astryx's stable BEM classes. */
+.astryx-radio-list-item .astryx-item > span:first-child {
+  align-items: center;
+}
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
