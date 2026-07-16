@@ -57,12 +57,12 @@ export default function SelectableWidget({
               aria-hidden="true"
               className="absolute pointer-events-none"
               style={{
-                top: '-15%',
-                right: '-15%',
-                bottom: '-25%',
-                left: '-70%',
+                top: '-30%',
+                right: '-30%',
+                bottom: '-45%',
+                left: '-100%',
                 zIndex: 0,
-                background: 'radial-gradient(ellipse 85% 85% at 68% 42%, rgba(255,255,255,0.95) 40%, rgba(255,255,255,0) 78%)',
+                background: 'radial-gradient(ellipse 90% 90% at 64% 46%, rgba(255,255,255,0.95) 65%, rgba(255,255,255,0) 88%)',
               }}
             />
             <div className="relative" style={{ zIndex: 1 }}>
