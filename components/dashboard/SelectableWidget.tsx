@@ -51,28 +51,30 @@ export default function SelectableWidget({
         <div className="absolute inset-0 rounded-xl bg-violet-500/[0.04] pointer-events-none" />
       )}
       {onEdit && isHovered && (
-        <div className="absolute top-3 right-3 z-10">
-          <div className="relative">
-            <div
-              aria-hidden="true"
-              className="absolute pointer-events-none"
-              style={{
-                top: '-30%',
-                right: '-30%',
-                bottom: '-45%',
-                left: '-100%',
-                zIndex: 0,
-                background: 'radial-gradient(ellipse 90% 90% at 64% 46%, rgba(255,255,255,0.95) 65%, rgba(255,255,255,0) 88%)',
-              }}
-            />
-            <div className="relative" style={{ zIndex: 1 }}>
-              <Button
-                label="Edit"
-                icon={<PencilGlyph />}
-                variant="secondary"
-                size="sm"
-                onClick={(e) => { e.stopPropagation(); onEdit(id); }}
+        <div className="absolute inset-0 rounded-xl overflow-hidden pointer-events-none z-10">
+          <div className="absolute top-3 right-3 pointer-events-auto">
+            <div className="relative">
+              <div
+                aria-hidden="true"
+                className="absolute pointer-events-none"
+                style={{
+                  top: '-30%',
+                  right: '-30%',
+                  bottom: '-45%',
+                  left: '-100%',
+                  zIndex: 0,
+                  background: 'radial-gradient(ellipse 90% 90% at 64% 46%, rgba(255,255,255,0.95) 65%, rgba(255,255,255,0) 88%)',
+                }}
               />
+              <div className="relative" style={{ zIndex: 1 }}>
+                <Button
+                  label="Edit"
+                  icon={<PencilGlyph />}
+                  variant="secondary"
+                  size="sm"
+                  onClick={(e) => { e.stopPropagation(); onEdit(id); }}
+                />
+              </div>
             </div>
           </div>
         </div>
