@@ -31,6 +31,8 @@ interface Props {
 
 const MAX_VISIBLE_SOURCE_CHIPS = 3;
 const MAX_MENTION_RESULTS = 5;
+const PROMPT_LINE_HEIGHT_PX = 24;
+const PROMPT_MAX_LINES = 3;
 
 function SourceGlyph({ className = 'w-3 h-3' }: { className?: string }) {
   return (
@@ -296,12 +298,22 @@ export default function PromptInput({
   const [mentionAnchor, setMentionAnchor] = useState<{ top: number; left: number; width: number } | null>(null);
   const [mentionActiveIndex, setMentionActiveIndex] = useState(0);
   const inputRowRef = useRef<HTMLDivElement>(null);
-  const textInputRef = useRef<HTMLInputElement>(null);
+  const textInputRef = useRef<HTMLTextAreaElement>(null);
 
   // Sync externally controlled value
   useEffect(() => {
     if (inputValue !== undefined) setValue(inputValue);
   }, [inputValue]);
+
+  // Auto-grow the textarea up to PROMPT_MAX_LINES; beyond that it scrolls
+  // internally instead of growing further.
+  useEffect(() => {
+    const el = textInputRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    const maxHeight = PROMPT_LINE_HEIGHT_PX * PROMPT_MAX_LINES;
+    el.style.height = `${Math.min(el.scrollHeight, maxHeight)}px`;
+  }, [value]);
 
   const handleChange = (v: string) => {
     setValue(v);
@@ -354,7 +366,7 @@ export default function PromptInput({
     });
   };
 
-  const handleKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (mention) {
       if (e.key === 'ArrowDown') {
         e.preventDefault();
@@ -434,10 +446,11 @@ export default function PromptInput({
         )}
 
         {/* Text input row */}
-        <div ref={inputRowRef} className="flex items-center gap-2 px-4 py-3 relative">
-          <input
+        <div ref={inputRowRef} className="flex items-end gap-2 px-4 py-3 relative">
+          <textarea
             ref={textInputRef}
             value={value}
+            rows={1}
             onChange={(e) => {
               handleChange(e.target.value);
               updateMentionFromCursor(e.target.value, e.target.selectionStart ?? e.target.value.length);
@@ -450,7 +463,8 @@ export default function PromptInput({
             }}
             onKeyDown={handleKey}
             placeholder={placeholder}
-            className="flex-1 bg-transparent text-base text-slate-700 placeholder:text-slate-400 outline-none"
+            className="flex-1 bg-transparent text-base text-slate-700 placeholder:text-slate-400 outline-none resize-none leading-6 overflow-y-auto"
+            style={{ maxHeight: PROMPT_LINE_HEIGHT_PX * PROMPT_MAX_LINES }}
           />
 
           {mention && mentionAnchor && (
