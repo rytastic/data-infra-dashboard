@@ -6,6 +6,8 @@ import { Popover } from '@astryxdesign/core/Popover';
 import { Button } from '@astryxdesign/core/Button';
 import { IconButton } from '@astryxdesign/core/IconButton';
 import { List, ListItem } from '@astryxdesign/core/List';
+import { TextInput } from '@astryxdesign/core/TextInput';
+import { Icon } from '@astryxdesign/core/Icon';
 
 interface SourceChip {
   id: string;
@@ -117,7 +119,12 @@ function AddSourceButton({
   onAdd: (s: SourceChip) => void;
 }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [query, setQuery] = useState('');
   if (sources.length === 0) return null;
+
+  const filteredSources = query.trim()
+    ? sources.filter(s => s.label.toLowerCase().includes(query.trim().toLowerCase()))
+    : sources;
 
   return (
     <Popover
@@ -126,18 +133,39 @@ function AddSourceButton({
       label="Add data source"
       width={280}
       isOpen={isOpen}
-      onOpenChange={setIsOpen}
+      onOpenChange={(open) => { setIsOpen(open); if (!open) setQuery(''); }}
       content={
-        <List density="compact">
-          {sources.map((s) => (
-            <ListItem
-              key={s.id}
-              label={s.label}
-              startContent={<SourceGlyph className="w-3.5 h-3.5" />}
-              onClick={() => { onAdd(s); setIsOpen(false); }}
+        <div>
+          <div className="px-1 pb-2">
+            <TextInput
+              label="Search data sources"
+              isLabelHidden
+              placeholder="Search data sources…"
+              startIcon={<Icon icon="search" size="sm" />}
+              size="sm"
+              value={query}
+              onChange={setQuery}
+              hasClear
+              hasAutoFocus
             />
-          ))}
-        </List>
+          </div>
+          <div style={{ maxHeight: 240, overflowY: 'auto' }}>
+            {filteredSources.length === 0 ? (
+              <p className="px-3 py-4 text-sm text-slate-400 text-center">No matches</p>
+            ) : (
+              <List density="compact">
+                {filteredSources.map((s) => (
+                  <ListItem
+                    key={s.id}
+                    label={s.label}
+                    startContent={<SourceGlyph className="w-3.5 h-3.5" />}
+                    onClick={() => { onAdd(s); setIsOpen(false); setQuery(''); }}
+                  />
+                ))}
+              </List>
+            )}
+          </div>
+        </div>
       }
     >
       <IconButton icon={<PlusGlyph />} label="Add data source" tooltip="Add data source" variant="secondary" size="sm" />
