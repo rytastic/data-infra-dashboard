@@ -44,7 +44,7 @@ export default function ManualEditPane({
 
   return (
     <div className="flex flex-col h-full bg-white">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 flex-shrink-0">
+      <div className="flex items-center justify-between h-16 px-4 border-b border-slate-100 flex-shrink-0">
         <div className="min-w-0">
           <h3 className="text-base font-semibold text-slate-900">Edit widget</h3>
           <p className="text-xs text-slate-400 truncate">{widgetLabel}</p>
