@@ -72,7 +72,7 @@ export default function AppSidebar({
       header={
         <SideNavHeading
           icon={<NavIcon icon={<DashboardIcon style={{ width: 16, height: 16 }} />} />}
-          heading="Cyclones Dashboard"
+          heading="Dashboard"
         />
       }
       topContent={
