@@ -2,9 +2,6 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { Layout, LayoutContent, LayoutPanel } from '@astryxdesign/core/Layout';
-import { TabList, Tab } from '@astryxdesign/core/TabList';
-import { IconButton } from '@astryxdesign/core/IconButton';
-import { Icon } from '@astryxdesign/core/Icon';
 import { type SelectorOptionType } from '@astryxdesign/core/Selector';
 import cyclonesData from '@/data/cyclones.json';
 import TEAMS from '@/data/teams';
@@ -71,8 +68,17 @@ const WIDGET_META: Record<string, { label: string; isChart: boolean }> = {
   leaderboard: { label: 'Player Leaderboard', isChart: false },
 };
 
+// The title actually rendered on each widget's card by default (before any
+// widgetTitles override) — distinct from WIDGET_META's label, which is used
+// for chat context tags and doesn't always match what's on screen.
+const WIDGET_DEFAULT_TITLES: Record<string, string> = {
+  'trend-chart': 'Season Trend',
+  'comparison-chart': 'Player Comparison',
+  stats: 'Season Highlights',
+  leaderboard: 'Player Leaderboard',
+};
+
 export type DashboardLayout = 'overview' | 'player-comparison' | 'top-scorers';
-type RightPaneTab = 'chat' | 'edit';
 
 interface Props {
   isPreview?: boolean;
@@ -120,9 +126,8 @@ export default function Dashboard({
     highlightedPlayer: string | null;
   } | null>(null);
 
-  // Manual (non-chat) per-widget editing: which widget's edit pane is showing,
-  // which tab is active, and per-widget team/season data-source overrides.
-  const [rightPaneTab, setRightPaneTab] = useState<RightPaneTab>('chat');
+  // Manual (non-chat) per-widget editing: which widget's edit pane is showing
+  // (swaps out the chat pane entirely), and per-widget data-source overrides.
   const [manualEditWidgetId, setManualEditWidgetId] = useState<string | null>(null);
   const [widgetDataOverrides, setWidgetDataOverrides] = useState<Record<string, { teamId: string; year?: string }>>({});
 
@@ -147,7 +152,6 @@ export default function Dashboard({
     setAccentColor('#3b82f6');
     setWidgetTitles({});
     setManualEditWidgetId(null);
-    setRightPaneTab('chat');
     setWidgetDataOverrides({});
   }, [teamId]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -308,7 +312,6 @@ export default function Dashboard({
   // happens by hovering a different widget and clicking its Edit button.
   const handleEditWidget = (id: string) => {
     setManualEditWidgetId(id);
-    setRightPaneTab('edit');
     if (!chatOpen) setChatOpen(true);
   };
 
@@ -316,6 +319,15 @@ export default function Dashboard({
     ? (WIDGET_META[manualEditWidgetId] ?? { label: manualEditWidgetId, isChart: false })
     : null;
   const manualEditIsTrend = manualEditWidgetId === 'trend-chart';
+
+  // The widget's actual on-canvas title: its custom override if one has been
+  // set, else the same default the widget itself falls back to when rendered.
+  const manualEditDefaultTitle = manualEditWidgetId === 'player-cards'
+    ? `Top Performers · ${resolveWidgetSeason('player-cards').year}`
+    : (manualEditWidgetId && WIDGET_DEFAULT_TITLES[manualEditWidgetId]) || (manualEditMeta?.label ?? '');
+  const manualEditDisplayTitle = manualEditWidgetId
+    ? (widgetTitles[manualEditWidgetId] ?? manualEditDefaultTitle)
+    : '';
 
   const dataSourceOptions: SelectorOptionType[] = manualEditWidgetId
     ? manualEditIsTrend
@@ -488,23 +500,7 @@ export default function Dashboard({
         !isPreview && chatOpen ? (
           <LayoutPanel width={384} hasDivider padding={0} isScrollable={false}>
             <div className="flex flex-col h-full">
-              <TabList value={rightPaneTab} onChange={(v) => setRightPaneTab(v as RightPaneTab)} hasDivider size="sm">
-                <Tab value="chat" label="Chat" />
-                {manualEditWidgetId && (
-                  <>
-                    <Tab value="edit" label="Edit" />
-                    <IconButton
-                      icon={<Icon icon="close" size="sm" />}
-                      label="Close edit tab"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => { setManualEditWidgetId(null); setRightPaneTab('chat'); }}
-                    />
-                  </>
-                )}
-              </TabList>
-
-              <div className="flex-1 min-h-0" style={{ display: rightPaneTab === 'chat' ? 'block' : 'none' }}>
+              <div className="flex-1 min-h-0" style={{ display: manualEditWidgetId ? 'none' : 'block' }}>
                 <ChatPane
                   onCommand={handleCommand}
                   onClose={() => setChatOpen(false)}
@@ -521,9 +517,10 @@ export default function Dashboard({
               </div>
 
               {manualEditWidgetId && manualEditMeta && (
-                <div className="flex-1 min-h-0" style={{ display: rightPaneTab === 'edit' ? 'block' : 'none' }}>
+                <div className="flex-1 min-h-0">
                   <ManualEditPane
-                    widgetLabel={manualEditMeta.label}
+                    widgetLabel={manualEditDisplayTitle}
+                    onClose={() => setManualEditWidgetId(null)}
                     titleValue={widgetTitles[manualEditWidgetId] ?? ''}
                     onTitleChange={handleManualTitleChange}
                     isChart={manualEditMeta.isChart}

@@ -319,6 +319,7 @@ export default function ChatPane({
               onChange={setInput}
               onSubmit={sendMessage}
               placeholder="Ask the data assistant…"
+              className="bg-white"
               drawer={
                 selectedWidgets.length > 0 ? (
                   <div className="px-1 pt-1">
