@@ -302,7 +302,7 @@ export default function ChatPane({
       <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 flex-shrink-0">
         <div className="flex items-center gap-2.5">
           {assistantAvatar}
-          <span className="text-sm font-semibold text-slate-900">Data assistant</span>
+          <span className="text-base font-semibold text-slate-900">Data assistant</span>
         </div>
         <div className="flex items-center gap-0.5">
           <IconButton icon={<PaperclipIcon />} label="Attach" variant="ghost" />

@@ -346,36 +346,38 @@ export default function Dashboard({
     ? (manualEditIsTrend ? currentTeamKey : `${currentTeamKey}::${currentOverride?.year ?? selectedYear}`)
     : '';
 
-  const handleDataSourceChange = (value: string) => {
-    if (!manualEditWidgetId) return;
-    if (manualEditIsTrend) {
-      setWidgetDataOverrides(prev => ({ ...prev, [manualEditWidgetId]: { teamId: value } }));
-    } else {
-      const [teamKey, year] = value.split('::');
-      setWidgetDataOverrides(prev => ({ ...prev, [manualEditWidgetId]: { teamId: teamKey, year } }));
-    }
-  };
-
-  const handleManualTitleChange = (value: string) => {
-    if (!manualEditWidgetId) return;
-    setWidgetTitles(prev => {
-      if (value.trim() === '') {
-        const next = { ...prev };
-        delete next[manualEditWidgetId];
-        return next;
-      }
-      return { ...prev, [manualEditWidgetId]: value };
-    });
-  };
-
   const manualEditChartType = manualEditWidgetId === 'trend-chart'
     ? trendChartType
     : manualEditWidgetId === 'comparison-chart'
       ? compChartType
       : undefined;
-  const handleManualChartTypeChange = (value: 'line' | 'bar') => {
-    if (manualEditWidgetId === 'trend-chart') setTrendChartType(value);
-    else if (manualEditWidgetId === 'comparison-chart') setCompChartType(value as 'bar' | 'line');
+
+  // Applies a manual-edit-pane draft to the dashboard in one shot — nothing
+  // from that pane touches live state until Save is pressed.
+  const handleManualEditSave = (values: { title: string; chartType?: 'line' | 'bar'; dataSourceValue: string }) => {
+    if (!manualEditWidgetId) return;
+
+    const trimmedTitle = values.title.trim();
+    setWidgetTitles(prev => {
+      if (trimmedTitle === '') {
+        const next = { ...prev };
+        delete next[manualEditWidgetId];
+        return next;
+      }
+      return { ...prev, [manualEditWidgetId]: trimmedTitle };
+    });
+
+    if (values.chartType) {
+      if (manualEditWidgetId === 'trend-chart') setTrendChartType(values.chartType);
+      else if (manualEditWidgetId === 'comparison-chart') setCompChartType(values.chartType as 'bar' | 'line');
+    }
+
+    if (manualEditIsTrend) {
+      setWidgetDataOverrides(prev => ({ ...prev, [manualEditWidgetId]: { teamId: values.dataSourceValue } }));
+    } else {
+      const [teamKey, year] = values.dataSourceValue.split('::');
+      setWidgetDataOverrides(prev => ({ ...prev, [manualEditWidgetId]: { teamId: teamKey, year } }));
+    }
   };
 
   return (
@@ -519,16 +521,15 @@ export default function Dashboard({
               {manualEditWidgetId && manualEditMeta && (
                 <div className="flex-1 min-h-0">
                   <ManualEditPane
+                    key={manualEditWidgetId}
                     widgetLabel={manualEditDisplayTitle}
                     onClose={() => setManualEditWidgetId(null)}
-                    titleValue={widgetTitles[manualEditWidgetId] ?? ''}
-                    onTitleChange={handleManualTitleChange}
+                    initialTitle={manualEditDisplayTitle}
                     isChart={manualEditMeta.isChart}
-                    chartType={manualEditChartType}
-                    onChartTypeChange={handleManualChartTypeChange}
-                    dataSourceValue={dataSourceValue}
+                    initialChartType={manualEditChartType}
+                    initialDataSourceValue={dataSourceValue}
                     dataSourceOptions={dataSourceOptions}
-                    onDataSourceChange={handleDataSourceChange}
+                    onSave={handleManualEditSave}
                   />
                 </div>
               )}
