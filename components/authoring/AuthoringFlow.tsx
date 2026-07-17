@@ -4,11 +4,14 @@ import { useState } from 'react';
 import { AppShell } from '@astryxdesign/core/AppShell';
 import { Carousel } from '@astryxdesign/core/Carousel';
 import { Button } from '@astryxdesign/core/Button';
+import { ClickableCard } from '@astryxdesign/core/ClickableCard';
+import { Icon } from '@astryxdesign/core/Icon';
 import AppSidebar, { type NavSection } from '@/components/shared/AppSidebar';
 import StepDataSource from './StepDataSource';
 import StepBreakdown from './StepBreakdown';
 import StepBuilding from './StepBuilding';
 import PromptInput from './PromptInput';
+import LegacyAuthoringWizard from './LegacyAuthoringWizard';
 import Dashboard, { type DashboardLayout } from '@/components/dashboard/Dashboard';
 import TEAMS from '@/data/teams';
 
@@ -121,6 +124,26 @@ function ChipCarousel({ chips, onSelect }: { chips: string[]; onSelect: (chip: s
   );
 }
 
+function LegacyAuthoringCTA({ onClick }: { onClick: () => void }) {
+  return (
+    <div className="w-full max-w-[600px]">
+      <ClickableCard
+        label="Legacy authoring — use the multi-step wizard to create your dashboard manually"
+        onClick={onClick}
+        width="100%"
+      >
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="text-sm font-semibold text-foreground">Legacy authoring</p>
+            <p className="text-sm text-slate-500 mt-0.5">Use the multi-step wizard to create your dashboard manually.</p>
+          </div>
+          <Icon icon="chevronRight" color="secondary" />
+        </div>
+      </ClickableCard>
+    </div>
+  );
+}
+
 const isCreating = (step: Step) =>
   step === 'datasource' || step === 'breakdown' || step === 'building';
 
@@ -142,12 +165,14 @@ export default function AuthoringFlow() {
   // marks nav item IDs that should open the chat pane with the "clone" welcome state
   const [navCloneWelcome, setNavCloneWelcome] = useState<Record<string, boolean>>({});
   const [selectedBreakdown, setSelectedBreakdown] = useState<string>('b3');
+  const [legacyView, setLegacyView] = useState(false);
 
   const handleNewDash = () => {
     setSelectedSources([]);
     setPromptInputValue('');
     setDatasourcePromptValue('');
     setSidebarCollapsed(true);
+    setLegacyView(false);
     setStep('datasource');
   };
 
@@ -156,6 +181,7 @@ export default function AuthoringFlow() {
     setSelectedSources([]);
     setPromptInputValue('');
     setDatasourcePromptValue('');
+    setLegacyView(false);
     setStep('dashboard');
   };
 
@@ -275,6 +301,10 @@ export default function AuthoringFlow() {
         className="flex flex-col h-full min-h-0 overflow-hidden"
         style={{ background: '#f1f5f9' }}
       >
+        {legacyView ? (
+          <LegacyAuthoringWizard onExit={() => setLegacyView(false)} />
+        ) : (
+        <>
         {step === 'dashboard' && (
           <Dashboard
             key={activeNavId}
@@ -391,10 +421,17 @@ export default function AuthoringFlow() {
                       }
                     }}
                   />
+
+                  {/* Entry point into the legacy multi-step wizard — centered in the remaining space below the chips */}
+                  <div className="flex-1 w-full min-h-0 flex items-center justify-center">
+                    <LegacyAuthoringCTA onClick={() => setLegacyView(true)} />
+                  </div>
                 </>
               )}
             </div>
           </>
+        )}
+        </>
         )}
       </div>
     </AppShell>
