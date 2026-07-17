@@ -1,8 +1,11 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
-import { Layout, LayoutContent, LayoutPanel } from '@astryxdesign/core/Layout';
+import { Layout, LayoutContent, LayoutPanel, LayoutFooter } from '@astryxdesign/core/Layout';
 import { Button } from '@astryxdesign/core/Button';
+import { MoreMenu } from '@astryxdesign/core/MoreMenu';
+import { Dialog, DialogHeader } from '@astryxdesign/core/Dialog';
+import { List, ListItem } from '@astryxdesign/core/List';
 import { type SelectorOptionType } from '@astryxdesign/core/Selector';
 import cyclonesData from '@/data/cyclones.json';
 import TEAMS from '@/data/teams';
@@ -14,7 +17,12 @@ import PlayerCards from './PlayerCards';
 import SelectableWidget from './SelectableWidget';
 import ManualEditPane from './ManualEditPane';
 import ChatPane, { type ParsedCommand, type WidgetContext } from '@/components/chat/ChatPane';
-import type { CyclonesData, ChartMetric, PendingEdit, Season, Player } from './types';
+import { Icon } from '@astryxdesign/core/Icon';
+import { IconButton } from '@astryxdesign/core/IconButton';
+import { HStack } from '@astryxdesign/core/HStack';
+import { Text } from '@astryxdesign/core/Text';
+import { Tooltip } from '@astryxdesign/core/Tooltip';
+import type { CyclonesData, ChartMetric, PendingEdit, Season, Player, EditableDashboardState, DashboardVersion } from './types';
 
 const fallbackData = cyclonesData as CyclonesData;
 
@@ -116,16 +124,22 @@ export default function Dashboard({
   const [widgetTitles, setWidgetTitles] = useState<Record<string, string>>({});
   const [pendingEdits, setPendingEdits] = useState<PendingEdit[]>([]);
   // snapshot taken before the first pending edit so we can revert all at once
-  const [editSnapshot, setEditSnapshot] = useState<{
-    trendChartType: 'line' | 'bar';
-    compChartType: 'bar' | 'line';
-    chartMetric: ChartMetric;
-    leaderboardSort: string;
-    leaderboardLimit: number | null;
-    accentColor: string;
-    widgetTitles: Record<string, string>;
-    highlightedPlayer: string | null;
-  } | null>(null);
+  const [editSnapshot, setEditSnapshot] = useState<EditableDashboardState | null>(null);
+
+  // Version history: v0 is the state the dashboard started in; each approved
+  // batch of edits appends a new version. currentVersionIndex tracks which
+  // version is currently applied to the live canvas.
+  const initialVersionState: EditableDashboardState = {
+    trendChartType: 'line', compChartType: 'bar', chartMetric: 'ppg',
+    leaderboardSort: 'ppg', leaderboardLimit: null, accentColor: '#3b82f6',
+    widgetTitles: {}, highlightedPlayer: null,
+  };
+  const [versions, setVersions] = useState<DashboardVersion[]>([
+    { label: 'v0', changes: [], state: initialVersionState },
+  ]);
+  const [currentVersionIndex, setCurrentVersionIndex] = useState(0);
+  const [isPublished, setIsPublished] = useState(false);
+  const [isPublishDialogOpen, setIsPublishDialogOpen] = useState(false);
 
   // Manual (non-chat) per-widget editing: which widget's edit pane is showing
   // (swaps out the chat pane entirely), and per-widget data-source overrides.
@@ -154,6 +168,10 @@ export default function Dashboard({
     setWidgetTitles({});
     setManualEditWidgetId(null);
     setWidgetDataOverrides({});
+    setVersions([{ label: 'v0', changes: [], state: initialVersionState }]);
+    setCurrentVersionIndex(0);
+    setIsPublished(false);
+    setIsPublishDialogOpen(false);
   }, [teamId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const season = useMemo(
@@ -287,9 +305,46 @@ export default function Dashboard({
   };
 
   const handleAcceptEdits = () => {
+    const newState: EditableDashboardState = {
+      trendChartType, compChartType, chartMetric, leaderboardSort,
+      leaderboardLimit, accentColor, widgetTitles, highlightedPlayer,
+    };
+    // Navigating back then approving a fresh edit discards the "future" versions.
+    const truncated = versions.slice(0, currentVersionIndex + 1);
+    setVersions([...truncated, { label: `v${truncated.length}`, changes: pendingEdits.map(e => e.description), state: newState }]);
+    setCurrentVersionIndex(truncated.length);
     setPendingEdits([]);
     setEditSnapshot(null);
     setSelectedWidgets([]);
+  };
+
+  const applyVersionState = (state: EditableDashboardState) => {
+    setTrendChartType(state.trendChartType);
+    setCompChartType(state.compChartType);
+    setChartMetric(state.chartMetric);
+    setLeaderboardSort(state.leaderboardSort);
+    setLeaderboardLimit(state.leaderboardLimit);
+    setAccentColor(state.accentColor);
+    setWidgetTitles(state.widgetTitles);
+    setHighlightedPlayer(state.highlightedPlayer);
+  };
+
+  const handleGoToVersion = (index: number) => {
+    if (index < 0 || index >= versions.length || pendingEdits.length > 0) return;
+    applyVersionState(versions[index].state);
+    setCurrentVersionIndex(index);
+    setSelectedWidgets([]);
+  };
+
+  const handleConfirmPublish = () => {
+    setIsPublished(true);
+    setChatOpen(false);
+    setIsPublishDialogOpen(false);
+  };
+
+  const handleExitPublished = () => {
+    setIsPublished(false);
+    setChatOpen(true);
   };
 
   const handleDiscardEdits = () => {
@@ -405,17 +460,30 @@ export default function Dashboard({
           </div>
 
           <div className="flex items-center gap-2">
-            {!isPreview && onCloneDashboard && (
-              <Button
-                label="Clone dashboard"
-                icon={<PlusIcon className="w-4 h-4" />}
-                variant="secondary"
-                onClick={onCloneDashboard}
-              />
+            {!isPreview && isPublished && (
+              <Button label="Edit" variant="secondary" onClick={handleExitPublished} />
             )}
 
-            {/* Reopen button — only when pane is closed */}
-            {!isPreview && !chatOpen && (
+            {!isPreview && !isPublished && (
+              <>
+                <VersionControl
+                  versions={versions}
+                  currentIndex={currentVersionIndex}
+                  onNavigate={handleGoToVersion}
+                  isNavigationDisabled={pendingEdits.length > 0}
+                />
+                <MoreMenu
+                  label="Dashboard options"
+                  items={[
+                    ...(onCloneDashboard ? [{ label: 'Copy dashboard', onClick: onCloneDashboard }] : []),
+                    { label: 'Publish dashboard', onClick: () => setIsPublishDialogOpen(true) },
+                  ]}
+                />
+              </>
+            )}
+
+            {/* Reopen button — only when pane is closed and dashboard isn't published */}
+            {!isPreview && !isPublished && !chatOpen && (
               <button
                 onClick={() => setChatOpen(true)}
                 className="flex items-center gap-2 px-3 py-2 rounded-full bg-slate-900 hover:bg-slate-700 text-white text-xs font-medium transition-colors shadow-sm"
@@ -426,6 +494,14 @@ export default function Dashboard({
             )}
           </div>
         </header>
+
+        <PublishDialog
+          isOpen={isPublishDialogOpen}
+          onOpenChange={setIsPublishDialogOpen}
+          version={versions[currentVersionIndex]}
+          previousVersionLabel={versions[currentVersionIndex - 1]?.label}
+          onConfirm={handleConfirmPublish}
+        />
 
         {/* Deselect on background click */}
         <div className="px-8 py-6 space-y-6" onClick={() => setSelectedWidgets([])}>
@@ -582,6 +658,44 @@ function LeaderboardWidget({ season, selectedWidgets, pendingWidgetIds, handleWi
   );
 }
 
+function VersionControl({ versions, currentIndex, onNavigate, isNavigationDisabled }: {
+  versions: import('./types').DashboardVersion[];
+  currentIndex: number;
+  onNavigate: (index: number) => void;
+  isNavigationDisabled: boolean;
+}) {
+  const current = versions[currentIndex];
+  const tooltip = current.changes.length > 0
+    ? `${current.label}: ${current.changes.join(', ')}`
+    : `${current.label}: initial version`;
+
+  return (
+    <HStack gap={0.5} vAlign="center" className="rounded-full pl-1 pr-1 py-1">
+      <IconButton
+        label="Previous version"
+        icon={<Icon icon="chevronLeft" color="inherit" />}
+        variant="ghost"
+        size="sm"
+        tooltip="Previous version"
+        isDisabled={isNavigationDisabled || currentIndex === 0}
+        onClick={() => onNavigate(currentIndex - 1)}
+      />
+      <Tooltip content={tooltip}>
+        <Text type="label" size="xsm" weight="semibold">{current.label}</Text>
+      </Tooltip>
+      <IconButton
+        label="Next version"
+        icon={<Icon icon="chevronRight" color="inherit" />}
+        variant="ghost"
+        size="sm"
+        tooltip="Next version"
+        isDisabled={isNavigationDisabled || currentIndex === versions.length - 1}
+        onClick={() => onNavigate(currentIndex + 1)}
+      />
+    </HStack>
+  );
+}
+
 function StarIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 16 16" fill="currentColor">
@@ -590,10 +704,42 @@ function StarIcon({ className }: { className?: string }) {
   );
 }
 
-function PlusIcon({ className }: { className?: string }) {
+function PublishDialog({ isOpen, onOpenChange, version, previousVersionLabel, onConfirm }: {
+  isOpen: boolean;
+  onOpenChange: (isOpen: boolean) => void;
+  version: import('./types').DashboardVersion;
+  previousVersionLabel?: string;
+  onConfirm: () => void;
+}) {
   return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-    </svg>
+    <Dialog isOpen={isOpen} onOpenChange={onOpenChange} width={440} purpose="form">
+      <Layout
+        header={<DialogHeader title={`Publish ${version.label}?`} onOpenChange={onOpenChange} />}
+        content={
+          <LayoutContent>
+            <Text type="body" color="secondary">
+              {version.changes.length > 0
+                ? `Changes since ${previousVersionLabel ?? 'the initial version'}:`
+                : 'This is the initial version — no changes have been made yet.'}
+            </Text>
+            {version.changes.length > 0 && (
+              <List listStyle="disc">
+                {version.changes.map((change, i) => (
+                  <ListItem key={i} label={change} />
+                ))}
+              </List>
+            )}
+          </LayoutContent>
+        }
+        footer={
+          <LayoutFooter>
+            <HStack gap={2} hAlign="end">
+              <Button label="Cancel" variant="secondary" onClick={() => onOpenChange(false)} />
+              <Button label="Publish" variant="primary" onClick={onConfirm} />
+            </HStack>
+          </LayoutFooter>
+        }
+      />
+    </Dialog>
   );
 }

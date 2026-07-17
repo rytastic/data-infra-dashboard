@@ -42,6 +42,23 @@ export interface PendingEdit {
   previewOptions?: { before: Record<string, any>; after: Record<string, any> };
 }
 
+export interface EditableDashboardState {
+  trendChartType: 'line' | 'bar';
+  compChartType: 'bar' | 'line';
+  chartMetric: ChartMetric;
+  leaderboardSort: string;
+  leaderboardLimit: number | null;
+  accentColor: string;
+  widgetTitles: Record<string, string>;
+  highlightedPlayer: string | null;
+}
+
+export interface DashboardVersion {
+  label: string;
+  changes: string[];
+  state: EditableDashboardState;
+}
+
 export const METRIC_LABELS: Record<ChartMetric, string> = {
   ppg: 'Points Per Game',
   rpg: 'Rebounds Per Game',

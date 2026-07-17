@@ -305,8 +305,6 @@ export default function ChatPane({
           <span className="text-base font-semibold text-slate-900">Data assistant</span>
         </div>
         <div className="flex items-center gap-0.5">
-          <IconButton icon={<PaperclipIcon />} label="Attach" variant="ghost" />
-          <IconButton icon={<DotsIcon />} label="More options" variant="ghost" />
           {onClose && <IconButton icon={<CloseIcon />} label="Close" variant="ghost" onClick={onClose} />}
         </div>
       </div>
@@ -606,22 +604,6 @@ function StarIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 16 16" fill="currentColor">
       <path d="M8 0.5L9.8 6.2L15.5 8L9.8 9.8L8 15.5L6.2 9.8L0.5 8L6.2 6.2L8 0.5Z" />
-    </svg>
-  );
-}
-
-function PaperclipIcon(props: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} {...props}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-    </svg>
-  );
-}
-
-function DotsIcon(props: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg fill="currentColor" viewBox="0 0 24 24" {...props}>
-      <circle cx="5" cy="12" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="19" cy="12" r="2" />
     </svg>
   );
 }
