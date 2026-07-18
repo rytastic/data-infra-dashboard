@@ -385,13 +385,10 @@ export default function AuthoringFlow() {
                         onAddSource={handleAddSource}
                         placeholder="Select data sources above or with @, or ask a data question"
                         inputValue={datasourcePromptValue}
-                        ctaLabel={datasourceHasPrompt ? 'Create dash' : 'Next'}
+                        ctaLabel="Next"
                         ctaEnabled={selectedSources.length > 0 || datasourceHasPrompt}
                         onValueChange={setDatasourcePromptValue}
-                        onSubmit={() => {
-                          if (datasourceHasPrompt) setStep('building');
-                          else setStep('breakdown');
-                        }}
+                        onSubmit={() => setStep('breakdown')}
                       />
                     )}
                     {step === 'breakdown' && (
