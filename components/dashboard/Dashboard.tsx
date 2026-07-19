@@ -100,6 +100,13 @@ interface Props {
   onCloneDashboard?: () => void;
 }
 
+// A freshly cloned dashboard starts a season behind so "Update with current
+// year data" has a real, visible change to make instead of a no-op.
+function initialYearFor(seasons: Season[], startOnPriorSeason: boolean): string {
+  if (startOnPriorSeason && seasons.length > 1) return seasons[seasons.length - 2].year;
+  return seasons[seasons.length - 1].year;
+}
+
 export default function Dashboard({
   isPreview = false,
   noSidebar = false,
@@ -111,7 +118,8 @@ export default function Dashboard({
   onCloneDashboard,
 }: Props) {
   const data = (teamId && TEAMS[teamId]) ? TEAMS[teamId] : fallbackData;
-  const [selectedYear, setSelectedYear] = useState(data.seasons[data.seasons.length - 1].year);
+  const defaultTeamKey = teamId && TEAMS[teamId] ? teamId : 'iowa-state';
+  const [selectedYear, setSelectedYear] = useState(initialYearFor(data.seasons, startWithCloneSuggestion));
   const [chartMetric, setChartMetric] = useState<ChartMetric>('ppg');
   const [highlightedPlayer, setHighlightedPlayer] = useState<string | null>(null);
   const [selectedWidgets, setSelectedWidgets] = useState<string[]>([]);
@@ -130,9 +138,10 @@ export default function Dashboard({
   // batch of edits appends a new version. currentVersionIndex tracks which
   // version is currently applied to the live canvas.
   const initialVersionState: EditableDashboardState = {
+    selectedYear: initialYearFor(data.seasons, startWithCloneSuggestion),
     trendChartType: 'line', compChartType: 'bar', chartMetric: 'ppg',
     leaderboardSort: 'ppg', leaderboardLimit: null, accentColor: '#3b82f6',
-    widgetTitles: {}, highlightedPlayer: null,
+    widgetTitles: {}, highlightedPlayer: null, widgetDataOverrides: {},
   };
   const [versions, setVersions] = useState<DashboardVersion[]>([
     { label: 'v0', changes: [], state: initialVersionState },
@@ -157,7 +166,7 @@ export default function Dashboard({
 
   // Reset all editable state whenever teamId changes
   useEffect(() => {
-    setSelectedYear(data.seasons[data.seasons.length - 1].year);
+    setSelectedYear(initialYearFor(data.seasons, startWithCloneSuggestion));
     setHighlightedPlayer(null);
     setSelectedWidgets([]);
     setTrendChartType('line');
@@ -206,9 +215,22 @@ export default function Dashboard({
     chartType: id === 'trend-chart' ? trendChartType : id === 'comparison-chart' ? compChartType : undefined,
   }));
 
+  // Edit ids the review card's checkmark has been unchecked for. Their live
+  // effect is already reverted via onToggle — this just keeps the on-canvas
+  // highlight ring in sync so it doesn't glow for a widget that won't change.
+  const [uncheckedEditIds, setUncheckedEditIds] = useState<Set<string>>(new Set());
+  const handleToggleEditChecked = (editId: string, checked: boolean) => {
+    setUncheckedEditIds(prev => {
+      const next = new Set(prev);
+      if (checked) next.delete(editId);
+      else next.add(editId);
+      return next;
+    });
+  };
+
   const pendingWidgetIds = useMemo(
-    () => Array.from(new Set(pendingEdits.flatMap(e => e.affectedWidgetIds))),
-    [pendingEdits]
+    () => Array.from(new Set(pendingEdits.filter(e => !uncheckedEditIds.has(e.id)).flatMap(e => e.affectedWidgetIds))),
+    [pendingEdits, uncheckedEditIds]
   );
 
   const handleCommand = (cmd: ParsedCommand): PendingEdit[] => {
@@ -217,7 +239,7 @@ export default function Dashboard({
     // Snapshot state before the first edit so we can revert all at once
     setPendingEdits(prev => {
       if (prev.length === 0) {
-        setEditSnapshot({ trendChartType, compChartType, chartMetric, leaderboardSort, leaderboardLimit, accentColor, widgetTitles, highlightedPlayer });
+        setEditSnapshot({ selectedYear, trendChartType, compChartType, chartMetric, leaderboardSort, leaderboardLimit, accentColor, widgetTitles, highlightedPlayer, widgetDataOverrides });
       }
       return prev;
     });
@@ -233,20 +255,33 @@ export default function Dashboard({
           before: miniCompOption(compChartType, season.players, beforeMetric, accentColor),
           after: miniCompOption(compChartType, season.players, afterMetric, accentColor),
         };
-        edits.push({ id: makeId(), description: `Changed metric to ${afterMetric.toUpperCase()}`, previewType: 'metric', before: beforeMetric.toUpperCase(), after: afterMetric.toUpperCase(), affectedWidgetIds: ['trend-chart', 'comparison-chart'], previewOptions });
+        edits.push({
+          id: makeId(), description: `Changed metric to ${afterMetric.toUpperCase()}`, previewType: 'metric',
+          before: beforeMetric.toUpperCase(), after: afterMetric.toUpperCase(), affectedWidgetIds: ['trend-chart', 'comparison-chart'], previewOptions,
+          onToggle: (checked) => setChartMetric(checked ? afterMetric : beforeMetric),
+        });
         break;
       }
       case 'highlight': {
         const before = highlightedPlayer ?? 'none';
-        setHighlightedPlayer(cmd.value ?? null);
+        const after = cmd.value ?? null;
+        setHighlightedPlayer(after);
         const label = cmd.value === '__top_scorer__' ? 'top scorer' : (cmd.value ?? '');
-        edits.push({ id: makeId(), description: `Highlighted ${label}`, previewType: 'highlight', before, after: label, affectedWidgetIds: ['leaderboard', 'player-cards'] });
+        edits.push({
+          id: makeId(), description: `Highlighted ${label}`, previewType: 'highlight', before, after: label, affectedWidgetIds: ['leaderboard', 'player-cards'],
+          onToggle: (checked) => setHighlightedPlayer(checked ? after : (before === 'none' ? null : before)),
+        });
         break;
       }
-      case 'clearHighlight':
+      case 'clearHighlight': {
+        const before = highlightedPlayer ?? 'none';
         setHighlightedPlayer(null);
-        edits.push({ id: makeId(), description: 'Cleared player highlight', previewType: 'highlight', before: highlightedPlayer ?? 'none', after: 'none', affectedWidgetIds: ['leaderboard', 'player-cards'] });
+        edits.push({
+          id: makeId(), description: 'Cleared player highlight', previewType: 'highlight', before, after: 'none', affectedWidgetIds: ['leaderboard', 'player-cards'],
+          onToggle: (checked) => setHighlightedPlayer(checked ? null : (before === 'none' ? null : before)),
+        });
         break;
+      }
       case 'setChartType': {
         const after = cmd.value as 'line' | 'bar';
         const targetIds = cmd.widgetIds ?? (cmd.widgetId ? [cmd.widgetId] : ['trend-chart']);
@@ -260,21 +295,35 @@ export default function Dashboard({
           const previewOptions = isTrend
             ? { before: miniTrendOption(before as 'line' | 'bar', data.seasons, chartMetric, accentColor), after: miniTrendOption(after, data.seasons, chartMetric, accentColor) }
             : { before: miniCompOption(before as 'bar' | 'line', season.players, chartMetric, accentColor), after: miniCompOption(after as 'bar' | 'line', season.players, chartMetric, accentColor) };
-          edits.push({ id: makeId(), description: `Changed ${chartLabel} to ${after} chart`, previewType: 'chart-type', before, after, affectedWidgetIds: [targetId], previewOptions });
+          edits.push({
+            id: makeId(), description: `Changed ${chartLabel} to ${after} chart`, previewType: 'chart-type', before, after, affectedWidgetIds: [targetId], previewOptions,
+            onToggle: (checked) => {
+              if (isTrend) setTrendChartType(checked ? after : (before as 'line' | 'bar'));
+              else setCompChartType(checked ? (after as 'bar' | 'line') : (before as 'bar' | 'line'));
+            },
+          });
         }
         break;
       }
       case 'setSort': {
         const before = leaderboardSort;
-        setLeaderboardSort(cmd.value ?? 'ppg');
-        edits.push({ id: makeId(), description: `Sorted leaderboard by ${cmd.value?.toUpperCase()}`, previewType: 'sort', before: before.toUpperCase(), after: (cmd.value ?? '').toUpperCase(), affectedWidgetIds: ['leaderboard'] });
+        const after = cmd.value ?? 'ppg';
+        setLeaderboardSort(after);
+        edits.push({
+          id: makeId(), description: `Sorted leaderboard by ${after.toUpperCase()}`, previewType: 'sort', before: before.toUpperCase(), after: after.toUpperCase(), affectedWidgetIds: ['leaderboard'],
+          onToggle: (checked) => setLeaderboardSort(checked ? after : before),
+        });
         break;
       }
       case 'setLimit': {
+        const beforeLimit = leaderboardLimit;
+        const beforeLabel = beforeLimit ? `Top ${beforeLimit}` : 'All players';
         const n = cmd.value ? parseInt(cmd.value) : null;
-        const before = leaderboardLimit ? `Top ${leaderboardLimit}` : 'All players';
         setLeaderboardLimit(n);
-        edits.push({ id: makeId(), description: n ? `Showing top ${n} players` : 'Showing all players', previewType: 'limit', before, after: n ? `Top ${n}` : 'All players', affectedWidgetIds: ['leaderboard'] });
+        edits.push({
+          id: makeId(), description: n ? `Showing top ${n} players` : 'Showing all players', previewType: 'limit', before: beforeLabel, after: n ? `Top ${n}` : 'All players', affectedWidgetIds: ['leaderboard'],
+          onToggle: (checked) => setLeaderboardLimit(checked ? n : beforeLimit),
+        });
         break;
       }
       case 'setAccentColor': {
@@ -285,14 +334,77 @@ export default function Dashboard({
           before: miniTrendOption(trendChartType, data.seasons, chartMetric, before),
           after: miniTrendOption(trendChartType, data.seasons, chartMetric, after),
         };
-        edits.push({ id: makeId(), description: 'Changed chart accent color', previewType: 'color', before, after, affectedWidgetIds: ['trend-chart', 'comparison-chart'], previewOptions });
+        edits.push({
+          id: makeId(), description: 'Changed chart accent color', previewType: 'color', before, after, affectedWidgetIds: ['trend-chart', 'comparison-chart'], previewOptions,
+          onToggle: (checked) => setAccentColor(checked ? after : before),
+        });
         break;
       }
       case 'setWidgetTitle': {
         if (cmd.widgetId && cmd.value) {
-          const before = widgetTitles[cmd.widgetId] ?? WIDGET_META[cmd.widgetId]?.label ?? cmd.widgetId;
-          setWidgetTitles(prev => ({ ...prev, [cmd.widgetId!]: cmd.value! }));
-          edits.push({ id: makeId(), description: `Renamed widget to "${cmd.value}"`, previewType: 'title', before, after: cmd.value, affectedWidgetIds: [cmd.widgetId] });
+          const widgetId = cmd.widgetId;
+          const afterTitle = cmd.value;
+          const hadCustomBefore = Object.prototype.hasOwnProperty.call(widgetTitles, widgetId);
+          const beforeTitle = widgetTitles[widgetId] ?? WIDGET_META[widgetId]?.label ?? widgetId;
+          setWidgetTitles(prev => ({ ...prev, [widgetId]: afterTitle }));
+          edits.push({
+            id: makeId(), description: `Renamed widget to "${afterTitle}"`, previewType: 'title', before: beforeTitle, after: afterTitle, affectedWidgetIds: [widgetId],
+            onToggle: (checked) => {
+              setWidgetTitles(prev => {
+                if (checked) return { ...prev, [widgetId]: afterTitle };
+                const next = { ...prev };
+                if (hadCustomBefore) next[widgetId] = beforeTitle;
+                else delete next[widgetId];
+                return next;
+              });
+            },
+          });
+        }
+        break;
+      }
+      case 'setSeason': {
+        const latestYear = data.seasons[data.seasons.length - 1].year;
+        // Each widget gets its own data-source override so a row can be
+        // toggled independently without moving the other three widgets.
+        const seasonTargets: { id: string; label: string }[] = [
+          { id: 'stats', label: 'Season Highlights' },
+          { id: 'comparison-chart', label: 'Player Comparison' },
+          { id: 'player-cards', label: 'Top Performers' },
+          { id: 'leaderboard', label: 'Player Leaderboard' },
+        ];
+
+        for (const target of seasonTargets) {
+          const beforeSeason = resolveWidgetSeason(target.id);
+          if (beforeSeason.year === latestYear) continue; // already current
+          const afterSeason = data.seasons.find(s => s.year === latestYear) ?? beforeSeason;
+          const beforeOverride = widgetDataOverrides[target.id];
+
+          setWidgetDataOverrides(prev => ({ ...prev, [target.id]: { teamId: defaultTeamKey, year: latestYear } }));
+
+          const isStats = target.id === 'stats';
+          const previewOptions = isStats ? undefined : {
+            before: miniCompOption(target.id === 'comparison-chart' ? compChartType : 'bar', beforeSeason.players, target.id === 'player-cards' ? 'ppg' : chartMetric, accentColor),
+            after: miniCompOption(target.id === 'comparison-chart' ? compChartType : 'bar', afterSeason.players, target.id === 'player-cards' ? 'ppg' : chartMetric, accentColor),
+          };
+
+          edits.push({
+            id: makeId(),
+            description: isStats ? `Updated ${target.label} to ${latestYear}` : `Updated ${target.label} to the ${latestYear} season`,
+            previewType: 'season',
+            before: isStats ? `${beforeSeason.record} · ${beforeSeason.avgPoints.toFixed(1)} PPG` : beforeSeason.year,
+            after: isStats ? `${afterSeason.record} · ${afterSeason.avgPoints.toFixed(1)} PPG` : latestYear,
+            affectedWidgetIds: [target.id],
+            previewOptions,
+            onToggle: (checked) => {
+              setWidgetDataOverrides(prev => {
+                const next = { ...prev };
+                if (checked) next[target.id] = { teamId: defaultTeamKey, year: latestYear };
+                else if (beforeOverride) next[target.id] = beforeOverride;
+                else delete next[target.id];
+                return next;
+              });
+            },
+          });
         }
         break;
       }
@@ -304,21 +416,28 @@ export default function Dashboard({
     return edits;
   };
 
-  const handleAcceptEdits = () => {
+  // checkedIds reflects which pending edits are still staged (their checkmark
+  // is on) at the moment Accept is pressed. Unchecked edits were already
+  // reverted live via onToggle, so only checked ones become part of the
+  // new version's change log.
+  const handleAcceptEdits = (checkedIds: string[]) => {
     const newState: EditableDashboardState = {
-      trendChartType, compChartType, chartMetric, leaderboardSort,
-      leaderboardLimit, accentColor, widgetTitles, highlightedPlayer,
+      selectedYear, trendChartType, compChartType, chartMetric, leaderboardSort,
+      leaderboardLimit, accentColor, widgetTitles, highlightedPlayer, widgetDataOverrides,
     };
+    const checkedEdits = pendingEdits.filter(e => checkedIds.includes(e.id));
     // Navigating back then approving a fresh edit discards the "future" versions.
     const truncated = versions.slice(0, currentVersionIndex + 1);
-    setVersions([...truncated, { label: `v${truncated.length}`, changes: pendingEdits.map(e => e.description), state: newState }]);
+    setVersions([...truncated, { label: `v${truncated.length}`, changes: checkedEdits.map(e => e.description), state: newState }]);
     setCurrentVersionIndex(truncated.length);
     setPendingEdits([]);
     setEditSnapshot(null);
+    setUncheckedEditIds(new Set());
     setSelectedWidgets([]);
   };
 
   const applyVersionState = (state: EditableDashboardState) => {
+    setSelectedYear(state.selectedYear);
     setTrendChartType(state.trendChartType);
     setCompChartType(state.compChartType);
     setChartMetric(state.chartMetric);
@@ -327,6 +446,7 @@ export default function Dashboard({
     setAccentColor(state.accentColor);
     setWidgetTitles(state.widgetTitles);
     setHighlightedPlayer(state.highlightedPlayer);
+    setWidgetDataOverrides(state.widgetDataOverrides);
   };
 
   const handleGoToVersion = (index: number) => {
@@ -349,6 +469,7 @@ export default function Dashboard({
 
   const handleDiscardEdits = () => {
     if (editSnapshot) {
+      setSelectedYear(editSnapshot.selectedYear);
       setTrendChartType(editSnapshot.trendChartType);
       setCompChartType(editSnapshot.compChartType);
       setChartMetric(editSnapshot.chartMetric);
@@ -357,9 +478,11 @@ export default function Dashboard({
       setAccentColor(editSnapshot.accentColor);
       setWidgetTitles(editSnapshot.widgetTitles);
       setHighlightedPlayer(editSnapshot.highlightedPlayer);
+      setWidgetDataOverrides(editSnapshot.widgetDataOverrides);
     }
     setPendingEdits([]);
     setEditSnapshot(null);
+    setUncheckedEditIds(new Set());
     // keep widget selection so the user can continue editing
   };
 
@@ -395,7 +518,6 @@ export default function Dashboard({
         }))
     : [];
 
-  const defaultTeamKey = teamId && TEAMS[teamId] ? teamId : 'iowa-state';
   const currentOverride = manualEditWidgetId ? widgetDataOverrides[manualEditWidgetId] : undefined;
   const currentTeamKey = currentOverride?.teamId ?? defaultTeamKey;
   const dataSourceValue = manualEditWidgetId
@@ -589,8 +711,9 @@ export default function Dashboard({
                   pendingEdits={pendingEdits}
                   onAcceptEdits={handleAcceptEdits}
                   onDiscardEdits={handleDiscardEdits}
+                  onToggleEditChecked={handleToggleEditChecked}
                   emptyHeading={startWithCloneSuggestion ? 'Ready to update' : undefined}
-                  emptySuggestions={startWithCloneSuggestion ? ['Update with current half data'] : undefined}
+                  emptySuggestions={startWithCloneSuggestion ? ['Update with current year data'] : undefined}
                 />
               </div>
 

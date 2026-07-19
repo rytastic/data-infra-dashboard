@@ -29,7 +29,7 @@ export interface CyclonesData {
 
 export type ChartMetric = 'ppg' | 'rpg' | 'apg' | 'spg';
 
-export type EditPreviewType = 'chart-type' | 'color' | 'metric' | 'sort' | 'limit' | 'title' | 'highlight';
+export type EditPreviewType = 'chart-type' | 'color' | 'metric' | 'sort' | 'limit' | 'title' | 'highlight' | 'season';
 
 export interface PendingEdit {
   id: string;
@@ -40,9 +40,13 @@ export interface PendingEdit {
   affectedWidgetIds: string[];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   previewOptions?: { before: Record<string, any>; after: Record<string, any> };
+  // Applies (true) or reverts (false) just this edit's live effect. Lets the
+  // review card's checkmarks stage/unstage individual edits before Accept.
+  onToggle?: (checked: boolean) => void;
 }
 
 export interface EditableDashboardState {
+  selectedYear: string;
   trendChartType: 'line' | 'bar';
   compChartType: 'bar' | 'line';
   chartMetric: ChartMetric;
@@ -51,6 +55,7 @@ export interface EditableDashboardState {
   accentColor: string;
   widgetTitles: Record<string, string>;
   highlightedPlayer: string | null;
+  widgetDataOverrides: Record<string, { teamId: string; year?: string }>;
 }
 
 export interface DashboardVersion {

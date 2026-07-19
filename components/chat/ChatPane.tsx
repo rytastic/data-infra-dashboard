@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import ReactECharts from 'echarts-for-react';
 import { Button } from '@astryxdesign/core/Button';
 import { IconButton } from '@astryxdesign/core/IconButton';
@@ -51,8 +51,9 @@ interface Props {
   selectedWidgets: WidgetContext[];
   onClearWidget: (id: string) => void;
   pendingEdits: PendingEdit[];
-  onAcceptEdits: () => void;
+  onAcceptEdits: (checkedIds: string[]) => void;
   onDiscardEdits: () => void;
+  onToggleEditChecked?: (editId: string, checked: boolean) => void;
   emptyHeading?: string;
   emptySuggestions?: string[];
 }
@@ -89,13 +90,25 @@ const COLOR_TRIGGERS: { patterns: RegExp[]; value: string; label: string }[] = [
 const HIGHLIGHT_TRIGGER = /highlight\s+([\w\s]+?)(?:\s+in|\s+on|\s*$)/i;
 const TOP_SCORER_TRIGGER = /highlight.*\btop\s+scor/i;
 const CLEAR_TRIGGER = /clear|remove|reset\s+highlight/i;
+const CURRENT_YEAR_TRIGGER = /update.*(current|latest)\s+year|update.*current\s+season|current\s+year\s+data/i;
+
+// The two chart widgets that exist on every dashboard layout. Used as the
+// target when a chart-type command isn't scoped to a specific selection —
+// "change charts to line charts" should affect every chart, not just one.
+const KNOWN_CHART_WIDGETS: WidgetContext[] = [
+  { id: 'trend-chart', label: 'Chart 1 · Scoring Trend', isChart: true },
+  { id: 'comparison-chart', label: 'Chart 2 · Game-by-Game Margin', isChart: true },
+];
 
 function buildChartTypeCommand(
   chartType: 'line' | 'bar',
   selectedWidgets: WidgetContext[],
   primaryWidget: WidgetContext | null,
 ): { command: ParsedCommand; response: string } {
-  const chartWidgets = selectedWidgets.filter(w => w.isChart);
+  const selectedChartWidgets = selectedWidgets.filter(w => w.isChart);
+  const chartWidgets = selectedChartWidgets.length > 0 || primaryWidget
+    ? selectedChartWidgets
+    : KNOWN_CHART_WIDGETS;
   if (chartWidgets.length > 1) {
     const widgetIds = chartWidgets.map(w => w.id);
     const labels = chartWidgets.map(w => w.label);
@@ -122,6 +135,12 @@ function parseCommand(
 ): { command: ParsedCommand; response: string } | null {
   if (CLEAR_TRIGGER.test(input)) {
     return { command: { type: 'clearHighlight' }, response: 'Cleared! The player highlight has been removed.' };
+  }
+  if (CURRENT_YEAR_TRIGGER.test(input)) {
+    return {
+      command: { type: 'setSeason', value: 'current' },
+      response: "Updated the dashboard to the current season's data — here's what changed:",
+    };
   }
   if (TOP_SCORER_TRIGGER.test(input)) {
     return {
@@ -212,6 +231,7 @@ export default function ChatPane({
   pendingEdits,
   onAcceptEdits,
   onDiscardEdits,
+  onToggleEditChecked,
   emptyHeading,
   emptySuggestions,
 }: Props) {
@@ -234,13 +254,16 @@ export default function ChatPane({
   const overflowCount = Math.max(0, selectedWidgets.length - MAX_VISIBLE_CHIPS);
   const isEmptyState = messages.length === 1 && messages[0].role === 'assistant' && selectedWidgets.length === 0 && pendingEdits.length === 0;
 
-  const handleAccept = async () => {
+  const handleAccept = async (checkedIds: string[]) => {
     setMessages(prev => [...prev, { id: ++msgIdCounter, role: 'user', text: 'Accept', timestamp: new Date() }]);
-    onAcceptEdits();
+    onAcceptEdits(checkedIds);
     setIsTyping(true);
     await new Promise(r => setTimeout(r, 600));
     setIsTyping(false);
-    setMessages(prev => [...prev, { id: ++msgIdCounter, role: 'assistant', text: 'Done! All changes have been applied to your dashboard.', timestamp: new Date() }]);
+    const text = checkedIds.length < pendingEdits.length
+      ? 'Done! The selected changes have been applied to your dashboard.'
+      : 'Done! All changes have been applied to your dashboard.';
+    setMessages(prev => [...prev, { id: ++msgIdCounter, role: 'assistant', text, timestamp: new Date() }]);
   };
 
   const handleDiscard = async () => {
@@ -424,7 +447,7 @@ export default function ChatPane({
 
                 {pendingEdits.length > 0 && (
                   <ChatMessage sender="assistant" avatar={assistantAvatar}>
-                    <EditsCard edits={pendingEdits} onAccept={handleAccept} onDiscard={handleDiscard} />
+                    <EditsCard edits={pendingEdits} onAccept={handleAccept} onDiscard={handleDiscard} onToggleChecked={onToggleEditChecked} />
                   </ChatMessage>
                 )}
               </>
@@ -462,12 +485,39 @@ interface HoverState {
   right: number;
 }
 
-function EditsCard({ edits, onAccept, onDiscard }: {
+function EditsCard({ edits, onAccept, onDiscard, onToggleChecked }: {
   edits: PendingEdit[];
-  onAccept: () => void;
+  onAccept: (checkedIds: string[]) => void;
   onDiscard: () => void;
+  onToggleChecked?: (editId: string, checked: boolean) => void;
 }) {
   const [hovered, setHovered] = useState<HoverState | null>(null);
+  const [checkedIds, setCheckedIds] = useState<Set<string>>(() => new Set(edits.map(e => e.id)));
+
+  // Edits added after mount (a follow-up command while the card is still
+  // open) default to checked, same as the initial batch.
+  useEffect(() => {
+    const missing = edits.filter(e => !checkedIds.has(e.id));
+    if (missing.length === 0) return;
+    setCheckedIds(prev => {
+      const next = new Set(prev);
+      for (const e of missing) next.add(e.id);
+      return next;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [edits]);
+
+  const toggleEdit = (edit: PendingEdit) => {
+    const nextChecked = !checkedIds.has(edit.id);
+    setCheckedIds(prev => {
+      const next = new Set(prev);
+      if (nextChecked) next.add(edit.id);
+      else next.delete(edit.id);
+      return next;
+    });
+    edit.onToggle?.(nextChecked);
+    onToggleChecked?.(edit.id, nextChecked);
+  };
 
   const handleMouseEnter = useCallback((e: React.MouseEvent<HTMLDivElement>, edit: PendingEdit) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -475,40 +525,52 @@ function EditsCard({ edits, onAccept, onDiscard }: {
   }, []);
 
   return (
-    <div className="rounded-2xl rounded-tl-sm bg-slate-100 overflow-hidden">
+    <div className="w-full min-w-0 rounded-2xl rounded-tl-sm bg-slate-100 overflow-hidden">
       <div className="px-5 pt-5 pb-3">
         <h3 className="text-xl font-bold text-slate-800">Review edits</h3>
       </div>
 
       <div className="px-3 pb-3">
-        {edits.map((edit, i) => (
-          <div key={edit.id}>
-            {i > 0 && <div className="border-t border-slate-200 mx-2" />}
-            <div
-              className="flex items-center justify-between px-2 py-3 gap-3 rounded-xl hover:bg-slate-200 transition-colors cursor-default"
-              onMouseEnter={(e) => handleMouseEnter(e, edit)}
-              onMouseLeave={() => setHovered(null)}
-            >
-              <div className="flex items-center gap-2 min-w-0">
-                <svg className="w-4 h-4 text-slate-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-                <span className="text-sm text-slate-700 leading-snug truncate">{edit.description}</span>
-              </div>
-              <div className="w-5 h-5 rounded flex-shrink-0 flex items-center justify-center bg-slate-800">
-                <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                </svg>
+        {edits.map((edit, i) => {
+          const isChecked = checkedIds.has(edit.id);
+          return (
+            <div key={edit.id}>
+              {i > 0 && <div className="border-t border-slate-200 mx-2" />}
+              <div
+                className="flex items-center justify-between px-2 py-3 gap-3 rounded-xl hover:bg-slate-200 transition-colors cursor-default"
+                onMouseEnter={(e) => handleMouseEnter(e, edit)}
+                onMouseLeave={() => setHovered(null)}
+              >
+                <div className={`flex items-center gap-2 min-w-0 transition-opacity ${isChecked ? '' : 'opacity-50'}`}>
+                  <svg className="w-4 h-4 text-slate-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  <span className="text-sm text-slate-700 leading-snug truncate">{edit.description}</span>
+                </div>
+                <button
+                  onClick={() => toggleEdit(edit)}
+                  aria-pressed={isChecked}
+                  aria-label={isChecked ? `Exclude "${edit.description}" from this batch` : `Include "${edit.description}" in this batch`}
+                  className={`w-5 h-5 rounded flex-shrink-0 flex items-center justify-center transition-colors ${
+                    isChecked ? 'bg-slate-800 hover:bg-slate-700' : 'bg-white border border-slate-300 hover:border-slate-400'
+                  }`}
+                >
+                  {isChecked && (
+                    <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                  )}
+                </button>
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       <div className="flex items-center justify-end gap-3 px-5 py-3 border-t border-slate-200">
         <Button label="Discard all" variant="ghost" onClick={onDiscard} />
-        <Button label="Accept" variant="primary" onClick={onAccept} />
+        <Button label="Accept" variant="primary" onClick={() => onAccept(Array.from(checkedIds))} isDisabled={checkedIds.size === 0} />
       </div>
 
       {/* Fixed-position before/after popover */}
